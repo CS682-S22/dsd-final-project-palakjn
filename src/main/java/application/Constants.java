@@ -1,4 +1,4 @@
-package server.configuration;
+package application;
 
 /**
  * Responsible for holding constant values to use.
@@ -13,5 +13,23 @@ public class Constants {
     public enum ROLE {
         LEADER,
         FOLLOWER
+    }
+
+    public enum REQUESTER {
+        CLIENT,
+        SERVER
+    }
+
+    public enum HEADER_TYPE {
+        REQ,
+        RESP,
+        DATA,
+        ACK,
+        NACK
+    }
+
+    public enum PACKET_TYPE {
+        VOTE,
+        APPEND_ENTRIES
     }
 }

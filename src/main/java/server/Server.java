@@ -5,7 +5,7 @@ import models.Host;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import server.configuration.Config;
-import server.configuration.Constants;
+import application.Constants;
 import server.controllers.CacheManager;
 import server.controllers.RequestHandler;
 import server.controllers.database.DataSource;

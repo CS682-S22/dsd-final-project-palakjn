@@ -5,7 +5,7 @@ import controllers.Connection;
 import controllers.NodeService;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import server.configuration.Constants;
+import application.Constants;
 import server.controllers.CacheManager;
 import server.controllers.Channels;
 import utils.Strings;
