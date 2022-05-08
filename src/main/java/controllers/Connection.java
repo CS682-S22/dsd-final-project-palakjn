@@ -1,7 +1,8 @@
-package server.controllers;
+package controllers;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import server.controllers.CacheManager;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -21,19 +22,9 @@ public class Connection implements Sender, Receiver {
     private Socket channel;
     protected String destinationIPAddress;
     protected int destinationPort;
-    protected String sourceIPAddress;
-    protected int sourcePort;
     private DataInputStream inputStream;
     private DataOutputStream outputStream;
     private volatile boolean isClosed;
-
-    public Connection(Socket channel, String destinationIPAddress, int destinationPort, String sourceIPAddress, int sourcePort) {
-        this.channel = channel;
-        this.destinationIPAddress = destinationIPAddress;
-        this.destinationPort = destinationPort;
-        this.sourceIPAddress = sourceIPAddress;
-        this.sourcePort = sourcePort;
-    }
 
     public Connection(Socket channel, String destinationIPAddress, int destinationPort) {
         this.channel = channel;
@@ -55,7 +46,7 @@ public class Connection implements Sender, Receiver {
             outputStream = new DataOutputStream(channel.getOutputStream());
             isSuccess = true;
         } catch (IOException exception) {
-            System.err.printf("[%s:%d] Unable to get input/output stream. Error: %s.\n", sourceIPAddress, sourcePort, exception.getMessage());
+            System.err.printf("[%s] Unable to get input/output stream. Error: %s.\n", CacheManager.getLocal().toString(), exception.getMessage());
         }
 
         return isSuccess;
@@ -73,20 +64,6 @@ public class Connection implements Sender, Receiver {
      */
     public int getDestinationPort() {
         return destinationPort;
-    }
-
-    /**
-     * @return the source host address
-     */
-    public String getSourceIPAddress() {
-        return sourceIPAddress;
-    }
-
-    /**
-     * @return the source port
-     */
-    public int getSourcePort() {
-        return sourcePort;
     }
 
     /**
@@ -135,7 +112,7 @@ public class Connection implements Sender, Receiver {
             //If getting socket exception means connection is refused or cancelled. In this case, will not attempt to make any operation
             isClosed = true;
         } catch (IOException exception) {
-            System.err.printf("[%s:%d] Fail to send message to %s:%d. Error: %s.\n", sourceIPAddress, sourcePort, destinationIPAddress, destinationPort, exception.getMessage());
+            System.err.printf("[%s] Fail to send message to %s:%d. Error: %s.\n", CacheManager.getLocal().toString(), destinationIPAddress, destinationPort, exception.getMessage());
         }
 
         return isSend;
@@ -160,7 +137,7 @@ public class Connection implements Sender, Receiver {
             //If getting socket exception means connection is refused or cancelled. In this case, will not attempt to make any operation
             isClosed = true;
         } catch (IOException exception) {
-            System.err.printf("[%s:%d] Fail to receive message from %s:%d. Error: %s.\n", sourceIPAddress, sourcePort, destinationIPAddress, destinationPort, exception.getMessage());
+            System.err.printf("[%s] Fail to receive message from %s:%d. Error: %s.\n", CacheManager.getLocal().toString(), destinationIPAddress, destinationPort, exception.getMessage());
         }
 
         return buffer;
@@ -192,7 +169,7 @@ public class Connection implements Sender, Receiver {
 
             isClosed = true;
         } catch (IOException e) {
-            System.err.printf("[%s:%d] Unable to close the connection. Error: %s", sourceIPAddress, sourcePort, e.getMessage());
+            System.err.printf("[%s] Unable to close the connection. Error: %s", CacheManager.getLocal().toString(), e.getMessage());
         }
     }
 }

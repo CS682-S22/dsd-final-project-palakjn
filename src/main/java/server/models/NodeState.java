@@ -7,7 +7,7 @@ package server.models;
  */
 public class NodeState {
     private int term;
-    private int votedFor = -1;
+    private int votedFor;
     private int commitLength;
     private int currentRole;
     private int currentLeader;
@@ -20,6 +20,7 @@ public class NodeState {
     }
 
     public NodeState() {
+        this.votedFor = -1;
     }
 
     /**

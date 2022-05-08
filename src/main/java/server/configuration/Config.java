@@ -13,6 +13,8 @@ import java.util.List;
  */
 public class Config {
     @Expose
+    private Host local;
+    @Expose
     private List<Host> members;
     @Expose
     private String dbUrl;
@@ -22,10 +24,30 @@ public class Config {
     private String password;
 
     /**
-     * Get the details of other members in the system
+     * Get the detail of local running instance
      */
-    public List<Host> getMembers() {
-        return members;
+    public Host getLocal() {
+        return local;
+    }
+
+    /**
+     * Get the member at the given index
+     */
+    public Host getMember(int index) {
+        Host host = null;
+
+        if (members != null && index < members.size()) {
+            host = members.get(index);
+        }
+
+        return host;
+    }
+
+    /**
+     * Get the number of members
+     */
+    public int getNumOfMembers() {
+        return members.size();
     }
 
     /**
@@ -53,6 +75,14 @@ public class Config {
      * Checks whether the config is valid or not
      */
     public boolean isValid() {
-        return !Strings.isNullOrEmpty(dbUrl) && !Strings.isNullOrEmpty(username) && !Strings.isNullOrEmpty(password) && members != null && members.size() > 0;
+        boolean isValid = local != null && local.isValid() && !Strings.isNullOrEmpty(dbUrl) && !Strings.isNullOrEmpty(username) && !Strings.isNullOrEmpty(password) && members != null && members.size() > 0;
+
+        if (members != null) {
+            for (Host member : members) {
+                isValid = member.isValid() && isValid;
+            }
+        }
+
+        return isValid;
     }
 }

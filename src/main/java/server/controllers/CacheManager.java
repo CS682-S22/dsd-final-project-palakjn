@@ -1,5 +1,6 @@
 package server.controllers;
 
+import models.Host;
 import server.models.Entry;
 import server.models.NodeState;
 
@@ -13,6 +14,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  * @author Palak Jain
  */
 public class CacheManager {
+    private static Members members = new Members();
     private static NodeState nodeState = new NodeState();
     private static List<Integer> sentLength = new ArrayList<>(); //Total number of the logs being sent to other nodes. Log index represents node id.
     private static List<Integer> ackedLength = new ArrayList<>(); // Total number of the logs received by the other nodes. Log index represents node id.
@@ -20,8 +22,66 @@ public class CacheManager {
     private static List<Entry> entries = new ArrayList<>(); //List of offsets of the received log from client/leader
 
     //Locks
+    private static ReentrantReadWriteLock memberLock = new ReentrantReadWriteLock();
     private static ReentrantReadWriteLock statusLock = new ReentrantReadWriteLock();
     private static ReentrantReadWriteLock dataLock = new ReentrantReadWriteLock();
+
+    /**
+     * Set the details of server running the current instance
+     */
+    public static void setLocal(Host local) {
+        memberLock.writeLock().lock();
+        members.setLocal(local);
+        memberLock.writeLock().unlock();
+    }
+
+    /**
+     * Get the details of server running the current instance
+     */
+    public static Host getLocal() {
+        memberLock.readLock().lock();
+
+        try {
+            return members.getLocalHost();
+        } finally {
+            memberLock.readLock().unlock();
+        }
+    }
+
+    /**
+     * Add new member if not exist
+     */
+    public static void addMember(Host member) {
+        memberLock.writeLock().lock();
+        members.addMember(member);
+        memberLock.writeLock().unlock();
+    }
+
+    /**
+     * Get the member with the given id
+     */
+    public static Host Member(int id) {
+        memberLock.readLock().lock();
+
+        try {
+            return members.getMember(id);
+        } finally {
+            memberLock.readLock().unlock();
+        }
+    }
+
+    /**
+     * Get all the other members in the zone
+     */
+    public static List<Host> getNeighbors() {
+        memberLock.readLock().lock();
+
+        try {
+            return members.getNeighbors();
+        } finally {
+            memberLock.readLock().unlock();
+        }
+    }
 
     /**
      * Get the current term

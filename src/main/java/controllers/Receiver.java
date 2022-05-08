@@ -1,4 +1,4 @@
-package server.controllers;
+package controllers;
 
 /**
  * Interface for receiving messages

@@ -1,5 +1,7 @@
 package server.controllers;
 
+import controllers.Connection;
+
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
