@@ -8,6 +8,11 @@ import server.configuration.Config;
 import server.configuration.Constants;
 import server.controllers.CacheManager;
 import server.controllers.RequestHandler;
+import server.controllers.database.DataSource;
+import server.controllers.database.EntryDB;
+import server.controllers.database.StateDB;
+import server.models.Entry;
+import server.models.NodeState;
 import utils.JSONDesrializer;
 import utils.Strings;
 
@@ -17,6 +22,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -40,10 +46,11 @@ public class Server {
             if (server.isValid(config)) {
                 CacheManager.setLocal(config.getLocal());
                 server.addMembers(config);
+                DataSource.init(config);
 
                 //Getting data from disk to get the details of status of the nodes before crash
-                server.setNodeStatus(config);
-                server.setNodeWithOldOffsets(config);
+                server.setNodeStatus();
+                server.setNodeWithOldOffsets();
 
                 //Joining to the network
                 logger.info(String.format("[%s] Listening on DATA/SYNC port %d.", config.getLocal().getAddress(), config.getLocal().getPort()));
@@ -124,19 +131,31 @@ public class Server {
     /**
      * Get the status of the node from disk and add it to the cache (To support Crash recovery)
      */
-    private void setNodeStatus(Config config) {
-        //TODO: Set the current role as follower
+    private void setNodeStatus() {
+        NodeState nodeState = StateDB.get();
+
+        if (nodeState != null) {
+            CacheManager.setNodeState(nodeState);
+        }
+
+        CacheManager.setCurrentRole(Constants.ROLE.FOLLOWER.ordinal());
     }
 
     /**
      * Get the offsets being read before by the server if it has been crashed before
      */
-    private void setNodeWithOldOffsets(Config config) {
+    private void setNodeWithOldOffsets() {
+        List<Entry> entries = EntryDB.getFrom(0);
 
+        if (entries != null) {
+            for (Entry entry : entries) {
+                CacheManager.addEntry(entry);
+            }
+        }
     }
 
     /**
-     * Listen for DATA/SYNC connection
+     * Listen for the connections from other servers/client
      */
     private void listen(String address, int port) {
         ServerSocket serverSocket;

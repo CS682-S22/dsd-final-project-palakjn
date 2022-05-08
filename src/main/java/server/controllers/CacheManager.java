@@ -84,6 +84,15 @@ public class CacheManager {
     }
 
     /**
+     * Set the status of the node
+     */
+    public static void setNodeState(NodeState nodeState) {
+        statusLock.writeLock().lock();
+        CacheManager.nodeState = nodeState;
+        statusLock.writeLock().unlock();
+    }
+
+    /**
      * Get the current term
      */
     public static int getTerm() {
@@ -306,6 +315,15 @@ public class CacheManager {
 
         //TODO: Insert entry MD to SQL
 
+        dataLock.writeLock().unlock();
+    }
+
+    /**
+     * Add the entry to the collection
+     */
+    public static void addEntry(Entry entry) {
+        dataLock.writeLock().lock();
+        entries.add(entry);
         dataLock.writeLock().unlock();
     }
 

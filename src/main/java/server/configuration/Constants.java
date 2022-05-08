@@ -9,4 +9,9 @@ public class Constants {
     public static final int START_VALID_PORT = 1700;
     public static final int END_VALID_PORT = 1724;
     public static int NUM_OF_THREADS = 50;
+
+    public enum ROLE {
+        LEADER,
+        FOLLOWER
+    }
 }
