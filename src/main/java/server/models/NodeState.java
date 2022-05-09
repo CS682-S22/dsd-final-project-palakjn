@@ -1,5 +1,7 @@
 package server.models;
 
+import application.Constants;
+
 /**
  * Holds the information of current status of the server
  *
@@ -21,6 +23,8 @@ public class NodeState {
 
     public NodeState() {
         this.votedFor = -1;
+        this.currentRole = Constants.ROLE.FOLLOWER.ordinal();
+        this.currentLeader = -1;
     }
 
     /**

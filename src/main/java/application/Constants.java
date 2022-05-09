@@ -12,7 +12,8 @@ public class Constants {
 
     public enum ROLE {
         LEADER,
-        FOLLOWER
+        FOLLOWER,
+        CANDIDATE
     }
 
     public enum REQUESTER {

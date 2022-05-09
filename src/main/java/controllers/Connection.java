@@ -1,5 +1,6 @@
 package controllers;
 
+import models.Host;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import server.controllers.CacheManager;
@@ -20,16 +21,14 @@ import java.net.SocketTimeoutException;
 public class Connection implements Sender, Receiver {
     private static final Logger logger = LogManager.getLogger(Connection.class);
     private Socket channel;
-    protected String destinationIPAddress;
-    protected int destinationPort;
+    protected Host destination;
     private DataInputStream inputStream;
     private DataOutputStream outputStream;
     private volatile boolean isClosed;
 
     public Connection(Socket channel, String destinationIPAddress, int destinationPort) {
         this.channel = channel;
-        this.destinationIPAddress = destinationIPAddress;
-        this.destinationPort = destinationPort;
+        destination = new Host(destinationIPAddress, destinationPort);
     }
 
     public Connection() {}
@@ -53,17 +52,17 @@ public class Connection implements Sender, Receiver {
     }
 
     /**
-     * @return the destination host address
+     * Set the address and port of the host from whom received OR to whom sent the packet
      */
-    public String getDestinationIPAddress() {
-        return destinationIPAddress;
+    public void setInfo(String address, int port) {
+        destination = new Host(address, port);
     }
 
     /**
-     * @return the destination port number
+     * Get the address and port of the host from whom received OR to whom sent the packet
      */
-    public int getDestinationPort() {
-        return destinationPort;
+    public Host getDestination() {
+        return destination;
     }
 
     /**
@@ -80,7 +79,7 @@ public class Connection implements Sender, Receiver {
         try {
             channel.setSoTimeout(timeout);
         } catch (SocketException e) {
-            logger.error(String.format("[%s:%d] Unable to set wait timer of amount %d. Error: ", destinationIPAddress, destinationPort, timeout), e);
+            logger.error(String.format("[%s] Unable to set wait timer of amount %d. Error: ", CacheManager.getLocal().toString(), timeout), e);
         }
     }
 
@@ -91,7 +90,7 @@ public class Connection implements Sender, Receiver {
         try {
             channel.setSoTimeout(0);
         } catch (SocketException e) {
-            logger.error(String.format("[%s:%d] Unable to reset wait timer to 0. Error: ", destinationIPAddress, destinationPort), e);
+            logger.error(String.format("[%s] Unable to reset wait timer to 0. Error: ", CacheManager.getLocal().toString()), e);
         }
     }
 
@@ -112,7 +111,7 @@ public class Connection implements Sender, Receiver {
             //If getting socket exception means connection is refused or cancelled. In this case, will not attempt to make any operation
             isClosed = true;
         } catch (IOException exception) {
-            System.err.printf("[%s] Fail to send message to %s:%d. Error: %s.\n", CacheManager.getLocal().toString(), destinationIPAddress, destinationPort, exception.getMessage());
+            System.err.printf("[%s] Fail to send message to %s. Error: %s.\n", CacheManager.getLocal().toString(), destination.toString(), exception.getMessage());
         }
 
         return isSend;
@@ -137,7 +136,7 @@ public class Connection implements Sender, Receiver {
             //If getting socket exception means connection is refused or cancelled. In this case, will not attempt to make any operation
             isClosed = true;
         } catch (IOException exception) {
-            System.err.printf("[%s] Fail to receive message from %s:%d. Error: %s.\n", CacheManager.getLocal().toString(), destinationIPAddress, destinationPort, exception.getMessage());
+            System.err.printf("[%s] Fail to receive message from %s. Error: %s.\n", CacheManager.getLocal().toString(), destination.toString(), exception.getMessage());
         }
 
         return buffer;

@@ -32,6 +32,12 @@ public class Host {
         this.nodeService = new NodeService();
     }
 
+    public Host(String address, int port) {
+        this.address = address;
+        this.port = port;
+        this.nodeService = new NodeService();
+    }
+
     /**
      * Get the identifier of the host
      */

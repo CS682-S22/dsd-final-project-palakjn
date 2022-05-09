@@ -1,11 +1,17 @@
 package server.controllers;
 
+import com.mysql.cj.xdevapi.Client;
 import models.Host;
+import server.controllers.database.EntryDB;
 import server.models.Entry;
 import server.models.NodeState;
+import server.models.SyncState;
+import utils.FileManager;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
@@ -16,6 +22,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 public class CacheManager {
     private static Members members = new Members();
     private static NodeState nodeState = new NodeState();
+    private static Map<String, SyncState> syncState = new HashMap<>();
     private static List<Integer> sentLength = new ArrayList<>(); //Total number of the logs being sent to other nodes. Log index represents node id.
     private static List<Integer> ackedLength = new ArrayList<>(); // Total number of the logs received by the other nodes. Log index represents node id.
     private static List<Integer>  lastLogTermReceived = new ArrayList<>(); //Term of the last log received by the other nodes. Log index represents node id.
@@ -24,6 +31,7 @@ public class CacheManager {
     //Locks
     private static ReentrantReadWriteLock memberLock = new ReentrantReadWriteLock();
     private static ReentrantReadWriteLock statusLock = new ReentrantReadWriteLock();
+    private static ReentrantReadWriteLock syncStateLock = new ReentrantReadWriteLock();
     private static ReentrantReadWriteLock dataLock = new ReentrantReadWriteLock();
 
     /**
@@ -60,7 +68,7 @@ public class CacheManager {
     /**
      * Get the member with the given id
      */
-    public static Host Member(int id) {
+    public static Host getMember(int id) {
         memberLock.readLock().lock();
 
         try {
@@ -233,6 +241,30 @@ public class CacheManager {
     }
 
     /**
+     * Get the number of data received from the client
+     */
+    public static int getReceivedLength(String clientId) {
+        syncStateLock.readLock().lock();
+        int dataCount = 0;
+
+        if (syncState.containsKey(clientId)) {
+            dataCount = syncState.get(clientId).getReceivedCount();
+        }
+
+        syncStateLock.readLock().unlock();
+        return dataCount;
+    }
+
+    /**
+     * Set the number of data received from the client
+     */
+    public static void setReceivedLength(String clientId, int numOfDataFromClient) {
+        syncStateLock.writeLock().lock();
+        syncState.put(clientId, new SyncState(clientId, numOfDataFromClient));
+        syncStateLock.writeLock().unlock();
+    }
+
+    /**
      * Set the number of logs being known to be sent to the given nodeId
      */
     public static void setSentLength(int nodeId, int length) {
@@ -261,9 +293,7 @@ public class CacheManager {
      */
     public static void setAckedLength(int nodeId, int length) {
         dataLock.writeLock().lock();
-
         ackedLength.set(nodeId, length);
-
         dataLock.writeLock().unlock();
     }
 
@@ -307,15 +337,26 @@ public class CacheManager {
     /**
      * Append log to the local file and add term, offset information as new entry to in-memory and db
      */
-    public static void addEntry(int term, byte[] log) {
+    public static boolean addEntry(byte[] log) {
         dataLock.writeLock().lock();
-        //TODO: Write to local file
+        //Writing log data to local file
+        int offset = 0;
+        if (entries.size() > 0) {
+            offset = entries.get(entries.size() - 1).getToOffset() + 1;
+        }
+        boolean isSuccess = FileManager.write(log, offset);
 
-        //TODO: entries.add(entry);
+        if (isSuccess) {
+            //Adding new entry to in-memory data structure
+            Entry entry = new Entry(getTerm(), offset, offset + log.length - 1);
+            entries.add(entry);
 
-        //TODO: Insert entry MD to SQL
+            //Adding new entry to SQL
+            EntryDB.insert(entry);
+        }
 
         dataLock.writeLock().unlock();
+        return isSuccess;
     }
 
     /**
@@ -325,6 +366,19 @@ public class CacheManager {
         dataLock.writeLock().lock();
         entries.add(entry);
         dataLock.writeLock().unlock();
+    }
+
+    /**
+     * Get the length of received log
+     */
+    public static int getLogLength() {
+        dataLock.readLock().lock();
+
+        try {
+            return entries.size();
+        } finally {
+            dataLock.readLock().unlock();
+        }
     }
 
     /**

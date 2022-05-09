@@ -22,6 +22,8 @@ public class Config {
     private String username;
     @Expose
     private String password;
+    @Expose
+    private String location;
 
     /**
      * Get the detail of local running instance
@@ -72,10 +74,31 @@ public class Config {
     }
 
     /**
+     * Get the file location
+     */
+    public String getLocation() {
+        return location;
+    }
+
+    /**
+     * Set the file location
+     */
+    public void setLocation(String location) {
+        this.location = location;
+    }
+
+    /**
      * Checks whether the config is valid or not
      */
     public boolean isValid() {
-        boolean isValid = local != null && local.isValid() && !Strings.isNullOrEmpty(dbUrl) && !Strings.isNullOrEmpty(username) && !Strings.isNullOrEmpty(password) && members != null && members.size() > 0;
+        boolean isValid = local != null &&
+                          local.isValid() &&
+                          !Strings.isNullOrEmpty(dbUrl) &&
+                          !Strings.isNullOrEmpty(username) &&
+                          !Strings.isNullOrEmpty(password) &&
+                          members != null &&
+                          members.size() > 0 &&
+                          !Strings.isNullOrEmpty(location);
 
         if (members != null) {
             for (Host member : members) {

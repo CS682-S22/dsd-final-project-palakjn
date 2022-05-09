@@ -51,7 +51,7 @@ public class StateDB {
                 nodeState = new NodeState(resultSet.getInt("term"),
                                           resultSet.getInt("votedFor"),
                                           resultSet.getInt("commitLength"),
-                                          resultSet.getInt("currentLeader"));
+                                          resultSet.getInt("leader"));
             }
         } catch (SQLException sqlException) {
             logger.error("Error while getting the state of the node", sqlException);
@@ -65,7 +65,7 @@ public class StateDB {
      */
     public static void update(NodeState nodeState) {
         try (Connection connection = DataSource.getConnection()) {
-            String query = "UPDATE state SET term = ?, votedFor = ?, commitLength = ?, currentLeader = ? WHERE id = 0";
+            String query = "UPDATE state SET term = ?, votedFor = ?, commitLength = ?, leader = ? WHERE id = 0";
 
             execute(nodeState, connection, query);
         } catch (SQLException sqlException) {
@@ -85,5 +85,4 @@ public class StateDB {
 
         statement.executeUpdate();
     }
-
 }
