@@ -17,10 +17,12 @@ public class RequestHandler {
     private static final Logger logger = LogManager.getLogger(RequestHandler.class);
     private Connection connection;
     private NodeService nodeService;
+    private Broadcast broadcast;
 
     public RequestHandler(Connection connection) {
         this.connection = connection;
         nodeService = new NodeService();
+        broadcast = new Broadcast();
     }
 
     /**
@@ -41,6 +43,7 @@ public class RequestHandler {
                     if (header.getRequester() == Constants.REQUESTER.CLIENT.ordinal()) {
                         if (header.getType() == Constants.HEADER_TYPE.DATA.ordinal()) {
                             logger.info(String.format("[%s] Received DATA request from client: %s.", CacheManager.getLocal().toString(), connection.getDestination().toString()));
+                            broadcast.process(connection, request, header.getSeqNum());
                         } else {
                             logger.info(String.format("[%s] Received invalid %d request type from client: %s.", CacheManager.getLocal().toString(), header.getType(), connection.getDestination().toString()));
                             nodeService.sendNACK(connection, Constants.REQUESTER.SERVER, header.getSeqNum(), connection.getDestination());

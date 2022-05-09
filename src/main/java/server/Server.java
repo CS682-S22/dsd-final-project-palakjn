@@ -8,13 +8,11 @@ import server.configuration.Config;
 import application.Constants;
 import server.controllers.CacheManager;
 import server.controllers.RequestHandler;
-import server.controllers.database.ClientSyncDB;
 import server.controllers.database.DataSource;
 import server.controllers.database.EntryDB;
 import server.controllers.database.StateDB;
 import server.models.Entry;
 import server.models.NodeState;
-import server.models.SyncState;
 import utils.FileManager;
 import utils.JSONDesrializer;
 import utils.Strings;
@@ -55,7 +53,6 @@ public class Server {
                 //Getting data from disk to get the details of status of the nodes before crash
                 server.setNodeStatus();
                 server.setNodeWithOldOffsets();
-                server.setSyncState();
 
                 //Joining to the network
                 logger.info(String.format("[%s] Listening on DATA/SYNC port %d.", config.getLocal().getAddress(), config.getLocal().getPort()));
@@ -155,19 +152,6 @@ public class Server {
         if (entries != null) {
             for (Entry entry : entries) {
                 CacheManager.addEntry(entry);
-            }
-        }
-    }
-
-    /**
-     * Get the number of data being received from all the clients by the server
-     */
-    private void setSyncState() {
-        List<SyncState> syncStates = ClientSyncDB.get();
-
-        if (syncStates != null) {
-            for (SyncState syncState : syncStates) {
-                CacheManager.setReceivedLength(syncState.getClientId(), syncState.getReceivedCount());
             }
         }
     }

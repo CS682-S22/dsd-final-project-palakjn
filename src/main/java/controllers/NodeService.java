@@ -43,7 +43,7 @@ public class NodeService {
      * Send negative acknowledgment response to the host
      */
     public void sendNACK(Connection connection, Constants.REQUESTER requester, int seqNum, Host destination) {
-        byte[] acknowledgement = PacketHandler.createACK(requester, seqNum, CacheManager.getLocal(), destination);
-        connection.send(acknowledgement);
+        byte[] acknowledgement = PacketHandler.createACK(requester, seqNum, destination);
+        connection.getDestination().send(acknowledgement);
     }
 }

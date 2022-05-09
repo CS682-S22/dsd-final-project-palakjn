@@ -24,12 +24,14 @@ public class EntryDB {
      */
     public static void insert(Entry entry) {
         try (Connection connection = DataSource.getConnection()) {
-            String query = "INSERT INTO entries VALUES (?, ?, ?)";
+            String query = "INSERT INTO entries VALUES (?, ?, ?, ?, ?)";
 
             PreparedStatement statement = connection.prepareStatement(query);
             statement.setInt(0, entry.getTerm());
             statement.setInt(1, entry.getFromOffset());
             statement.setInt(2, entry.getToOffset());
+            statement.setString(3, entry.getClientId());
+            statement.setInt(4, entry.getReceivedOffset());
 
             statement.executeUpdate();
         } catch (SQLException sqlException) {
@@ -67,7 +69,11 @@ public class EntryDB {
 
             ResultSet resultSet = statement.executeQuery();
             while (resultSet.next()) {
-                Entry entry = new Entry(resultSet.getInt("term"), resultSet.getInt("fromOffset"), resultSet.getInt("toOffset"));
+                Entry entry = new Entry(resultSet.getInt("term"),
+                                    resultSet.getInt("fromOffset"),
+                                    resultSet.getInt("toOffset"),
+                                    resultSet.getString("clientId"),
+                                    resultSet.getInt("clientOffset"));
                 if (entries == null) { entries = new ArrayList<>(); }
                 entries.add(entry);
             }

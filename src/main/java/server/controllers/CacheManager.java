@@ -1,11 +1,9 @@
 package server.controllers;
 
-import com.mysql.cj.xdevapi.Client;
 import models.Host;
 import server.controllers.database.EntryDB;
 import server.models.Entry;
 import server.models.NodeState;
-import server.models.SyncState;
 import utils.FileManager;
 
 import java.util.ArrayList;
@@ -22,7 +20,6 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 public class CacheManager {
     private static Members members = new Members();
     private static NodeState nodeState = new NodeState();
-    private static Map<String, SyncState> syncState = new HashMap<>();
     private static List<Integer> sentLength = new ArrayList<>(); //Total number of the logs being sent to other nodes. Log index represents node id.
     private static List<Integer> ackedLength = new ArrayList<>(); // Total number of the logs received by the other nodes. Log index represents node id.
     private static List<Integer>  lastLogTermReceived = new ArrayList<>(); //Term of the last log received by the other nodes. Log index represents node id.
@@ -31,7 +28,6 @@ public class CacheManager {
     //Locks
     private static ReentrantReadWriteLock memberLock = new ReentrantReadWriteLock();
     private static ReentrantReadWriteLock statusLock = new ReentrantReadWriteLock();
-    private static ReentrantReadWriteLock syncStateLock = new ReentrantReadWriteLock();
     private static ReentrantReadWriteLock dataLock = new ReentrantReadWriteLock();
 
     /**
@@ -241,27 +237,25 @@ public class CacheManager {
     }
 
     /**
-     * Get the number of data received from the client
+     * Get the last received starting offset from the given client
      */
-    public static int getReceivedLength(String clientId) {
-        syncStateLock.readLock().lock();
-        int dataCount = 0;
+    public static int getLastReceivedOffset(String clientId) {
+        dataLock.readLock().lock();
+        int clientOffset = 0;
+        int lastIndex = entries.size() - 1;
 
-        if (syncState.containsKey(clientId)) {
-            dataCount = syncState.get(clientId).getReceivedCount();
+        while (lastIndex >= 0) {
+            Entry entry = entries.get(lastIndex);
+
+            if (entry.getClientId().equals(clientId)) {
+                clientOffset = entry.getReceivedOffset();
+                break;
+            }
+            lastIndex--;
         }
 
-        syncStateLock.readLock().unlock();
-        return dataCount;
-    }
-
-    /**
-     * Set the number of data received from the client
-     */
-    public static void setReceivedLength(String clientId, int numOfDataFromClient) {
-        syncStateLock.writeLock().lock();
-        syncState.put(clientId, new SyncState(clientId, numOfDataFromClient));
-        syncStateLock.writeLock().unlock();
+        dataLock.readLock().unlock();
+        return clientOffset;
     }
 
     /**
@@ -337,7 +331,7 @@ public class CacheManager {
     /**
      * Append log to the local file and add term, offset information as new entry to in-memory and db
      */
-    public static boolean addEntry(byte[] log) {
+    public static boolean addEntry(byte[] log, String clientId, int clientOffset) {
         dataLock.writeLock().lock();
         //Writing log data to local file
         int offset = 0;
@@ -348,7 +342,7 @@ public class CacheManager {
 
         if (isSuccess) {
             //Adding new entry to in-memory data structure
-            Entry entry = new Entry(getTerm(), offset, offset + log.length - 1);
+            Entry entry = new Entry(getTerm(), offset, offset + log.length - 1, clientId, clientOffset);
             entries.add(entry);
 
             //Adding new entry to SQL

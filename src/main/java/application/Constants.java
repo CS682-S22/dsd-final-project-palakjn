@@ -31,6 +31,12 @@ public class Constants {
 
     public enum PACKET_TYPE {
         VOTE,
-        APPEND_ENTRIES
+        APPEND_ENTRIES,
+        RESP
+    }
+
+    public enum RESPONSE_STATUS {
+        REDIRECT,
+        ELECTION
     }
 }

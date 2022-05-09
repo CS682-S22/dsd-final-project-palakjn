@@ -7,6 +7,7 @@ import models.Host;
 import models.Packet;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import server.controllers.CacheManager;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -25,8 +26,8 @@ public class PacketHandler {
     /**
      * Create the header part of the packet
      */
-    public static byte[] createHeader(Constants.REQUESTER requester, Constants.HEADER_TYPE type, int seqNum, Host source, Host destination) {
-        Header.Host sourceHost = Header.Host.newBuilder().setAddress(source.getAddress()).setPort(source.getPort()).build();
+    public static byte[] createHeader(Constants.REQUESTER requester, Constants.HEADER_TYPE type, int seqNum, Host destination) {
+        Header.Host sourceHost = Header.Host.newBuilder().setAddress(CacheManager.getLocal().getAddress()).setPort(CacheManager.getLocal().getPort()).build();
         Header.Host destinationHost = Header.Host.newBuilder().setAddress(destination.getAddress()).setPort(destination.getPort()).build();
 
         return Header.Content.newBuilder().setRequester(requester.ordinal()).setType(type.ordinal()).setSeqNum(seqNum).setSource(sourceHost).setDestination(destinationHost).build().toByteArray();
@@ -35,8 +36,8 @@ public class PacketHandler {
     /**
      * Creates an acknowledgement packet for the file chunk with the given sequence number
      */
-    public static byte[] createACK(Constants.REQUESTER requester, int seqNum, Host source, Host destination) {
-        byte[] header = createHeader(requester, Constants.HEADER_TYPE.ACK, seqNum, source, destination);
+    public static byte[] createACK(Constants.REQUESTER requester, int seqNum, Host destination) {
+        byte[] header = createHeader(requester, Constants.HEADER_TYPE.ACK, seqNum, destination);
 
         return ByteBuffer.allocate(4 + header.length).putInt(header.length).put(header).array();
     }
@@ -44,8 +45,8 @@ public class PacketHandler {
     /**
      * Creates negative acknowledgement packet for the file chunk with the given sequence number
      */
-    public static byte[] createNACK(Constants.REQUESTER requester, int seqNum, Host source, Host destination) {
-        byte[] header = createHeader(requester, Constants.HEADER_TYPE.NACK, seqNum, source, destination);
+    public static byte[] createNACK(Constants.REQUESTER requester, int seqNum, Host destination) {
+        byte[] header = createHeader(requester, Constants.HEADER_TYPE.NACK, seqNum, destination);
 
         return ByteBuffer.allocate(4 + header.length).putInt(header.length).put(header).array();
     }
@@ -54,11 +55,11 @@ public class PacketHandler {
      * Create the entire packet: header + body
      * @return byte array
      */
-    public static byte[] createPacket(Constants.REQUESTER requester, Constants.HEADER_TYPE type, byte[] body, int seqNum, Host source, Host destination) {
+    public static byte[] createPacket(Constants.REQUESTER requester, Constants.HEADER_TYPE type, byte[] body, int seqNum, Host destination) {
         byte[] packetBytes = null;
 
         if (body != null) {
-            byte[] header = createHeader(requester, type, seqNum, source, destination);
+            byte[] header = createHeader(requester, type, seqNum, destination);
             packetBytes = ByteBuffer.allocate(4 + header.length + body.length).putInt(header.length).put(header).put(body).array();
         }
 
@@ -69,10 +70,10 @@ public class PacketHandler {
      * Create the entire packet: header + body
      * @return byte array
      */
-    public static byte[] createPacket(Constants.REQUESTER requester, Constants.HEADER_TYPE type, Packet packet, int seqNum, Host source, Host destination) {
+    public static <T> byte[] createPacket(Constants.REQUESTER requester, Constants.HEADER_TYPE type, Packet<T> packet, int seqNum, Host destination) {
         byte[] body = packet.toByte();
 
-        return createPacket(requester, type, body, seqNum, source, destination);
+        return createPacket(requester, type, body, seqNum, destination);
     }
 
     /**
@@ -129,7 +130,7 @@ public class PacketHandler {
      * @param message the received message from the host
      * @return offset from where to read the message
      */
-    public static int getOffset(byte[] message) {
+    private static int getOffset(byte[] message) {
         int position = 0;
 
         try {
