@@ -2,7 +2,7 @@ package utils;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import server.controllers.CacheManager;
+import consensus.controllers.CacheManager;
 
 import java.io.FileOutputStream;
 import java.io.IOException;

@@ -7,7 +7,7 @@ import controllers.Connection;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.ThreadContext;
-import server.controllers.CacheManager;
+import consensus.controllers.CacheManager;
 import utils.FileManager;
 import utils.JSONDesrializer;
 import utils.Strings;

@@ -1,4 +1,4 @@
-package server.controllers;
+package consensus.controllers;
 
 import models.Host;
 

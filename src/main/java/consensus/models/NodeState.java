@@ -1,4 +1,4 @@
-package server.models;
+package consensus.models;
 
 import configuration.Constants;
 

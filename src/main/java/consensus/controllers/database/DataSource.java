@@ -1,6 +1,6 @@
-package server.controllers.database;
+package consensus.controllers.database;
 import org.apache.commons.dbcp2.BasicDataSource;
-import server.configuration.Config;
+import consensus.configuration.Config;
 
 import java.sql.Connection;
 import java.sql.SQLException;

@@ -6,8 +6,8 @@ import controllers.NodeService;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import configuration.Constants;
-import server.controllers.CacheManager;
-import server.controllers.Channels;
+import consensus.controllers.CacheManager;
+import consensus.controllers.Channels;
 import utils.Strings;
 
 /**

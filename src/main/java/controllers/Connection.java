@@ -3,7 +3,7 @@ package controllers;
 import models.Host;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import server.controllers.CacheManager;
+import consensus.controllers.CacheManager;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;

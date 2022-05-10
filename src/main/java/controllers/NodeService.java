@@ -4,7 +4,7 @@ import configuration.Constants;
 import models.Host;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import server.controllers.CacheManager;
+import consensus.controllers.CacheManager;
 import utils.PacketHandler;
 
 import java.io.IOException;

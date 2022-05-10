@@ -1,4 +1,4 @@
-package server.models;
+package consensus.models;
 
 /**
  * Responsible for holding the information about the log stored at the log index.

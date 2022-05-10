@@ -7,7 +7,7 @@ import models.Host;
 import models.Packet;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import server.controllers.CacheManager;
+import consensus.controllers.CacheManager;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;

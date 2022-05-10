@@ -1,15 +1,13 @@
-package server.controllers;
+package consensus.controllers;
 
 import models.Host;
-import server.controllers.database.EntryDB;
-import server.models.Entry;
-import server.models.NodeState;
+import consensus.controllers.database.EntryDB;
+import consensus.models.Entry;
+import consensus.models.NodeState;
 import utils.FileManager;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**

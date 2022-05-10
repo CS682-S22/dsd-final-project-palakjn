@@ -1,8 +1,8 @@
-package server.controllers.database;
+package consensus.controllers.database;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import server.models.NodeState;
+import consensus.models.NodeState;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;

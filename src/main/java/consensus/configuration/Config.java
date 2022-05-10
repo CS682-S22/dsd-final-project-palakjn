@@ -1,4 +1,4 @@
-package server.configuration;
+package consensus.configuration;
 
 import com.google.gson.annotations.Expose;
 import models.Host;
