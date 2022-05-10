@@ -11,6 +11,8 @@ public class Constants {
     public static int NUM_OF_THREADS = 50;
     public static int PRODUCER_WAIT_TIME = 30000;
     public static int PRODUCER_SLEEP_TIME = 500;
+    public static int SUFFIX_BATCH_SIZE = 10;
+    public static int REPLICATION_PERIOD = 500;
 
     public enum ROLE {
         LEADER,
@@ -38,6 +40,7 @@ public class Constants {
     }
 
     public enum RESPONSE_STATUS {
+        OK,
         REDIRECT,
         ELECTION
     }

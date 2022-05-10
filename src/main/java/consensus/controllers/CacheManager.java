@@ -1,5 +1,6 @@
 package consensus.controllers;
 
+import configuration.Constants;
 import models.Host;
 import consensus.controllers.database.EntryDB;
 import consensus.models.Entry;
@@ -372,6 +373,40 @@ public class CacheManager {
         } finally {
             dataLock.readLock().unlock();
         }
+    }
+
+    /**
+     * Get BATCH-SIZE number of entries from the given index
+     */
+    public static List<Entry> getEntries(int startIndex) {
+        dataLock.readLock().lock();
+        List<Entry> entries = new ArrayList<>();
+        int logLength = CacheManager.entries.size();
+        int count = 0;
+
+        while (startIndex < logLength && count < Constants.SUFFIX_BATCH_SIZE) {
+            entries.add(CacheManager.entries.get(startIndex));
+
+            startIndex++;
+            count++;
+        }
+
+        dataLock.readLock().unlock();
+        return entries;
+    }
+
+    /**
+     * Get the entry at the given index
+     */
+    public static Entry getEntry(int index) {
+        dataLock.readLock().lock();
+        Entry entry = null;
+
+        if (index < entries.size()) {
+            entry = entries.get(index);
+        }
+
+        return entry;
     }
 
     /**
