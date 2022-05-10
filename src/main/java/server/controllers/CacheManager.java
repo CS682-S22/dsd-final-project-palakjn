@@ -241,7 +241,7 @@ public class CacheManager {
      */
     public static int getLastReceivedOffset(String clientId) {
         dataLock.readLock().lock();
-        int clientOffset = 0;
+        int clientOffset = -1;
         int lastIndex = entries.size() - 1;
 
         while (lastIndex >= 0) {
@@ -251,6 +251,7 @@ public class CacheManager {
                 clientOffset = entry.getReceivedOffset();
                 break;
             }
+
             lastIndex--;
         }
 
@@ -287,7 +288,7 @@ public class CacheManager {
      */
     public static void setAckedLength(int nodeId, int length) {
         dataLock.writeLock().lock();
-        ackedLength.set(nodeId, length);
+        ackedLength.add(nodeId, length);
         dataLock.writeLock().unlock();
     }
 

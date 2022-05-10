@@ -27,11 +27,11 @@ public class EntryDB {
             String query = "INSERT INTO entries VALUES (?, ?, ?, ?, ?)";
 
             PreparedStatement statement = connection.prepareStatement(query);
-            statement.setInt(0, entry.getTerm());
-            statement.setInt(1, entry.getFromOffset());
-            statement.setInt(2, entry.getToOffset());
-            statement.setString(3, entry.getClientId());
-            statement.setInt(4, entry.getReceivedOffset());
+            statement.setInt(1, entry.getTerm());
+            statement.setInt(2, entry.getFromOffset());
+            statement.setInt(3, entry.getToOffset());
+            statement.setString(4, entry.getClientId());
+            statement.setInt(5, entry.getReceivedOffset());
 
             statement.executeUpdate();
         } catch (SQLException sqlException) {
@@ -47,7 +47,7 @@ public class EntryDB {
             String query = "DELETE FROM entries WHERE fromOffset >= ?";
 
             PreparedStatement statement = connection.prepareStatement(query);
-            statement.setInt(0, fromOffset);
+            statement.setInt(1, fromOffset);
 
             statement.executeUpdate();
         } catch (SQLException sqlException) {
@@ -65,7 +65,7 @@ public class EntryDB {
             String query = "SELECT * from entries WHERE fromOffset >= ?";
 
             PreparedStatement statement = connection.prepareStatement(query);
-            statement.setInt(0, fromOffset);
+            statement.setInt(1, fromOffset);
 
             ResultSet resultSet = statement.executeQuery();
             while (resultSet.next()) {
@@ -73,7 +73,7 @@ public class EntryDB {
                                     resultSet.getInt("fromOffset"),
                                     resultSet.getInt("toOffset"),
                                     resultSet.getString("clientId"),
-                                    resultSet.getInt("clientOffset"));
+                                    resultSet.getInt("receivedOffset"));
                 if (entries == null) { entries = new ArrayList<>(); }
                 entries.add(entry);
             }

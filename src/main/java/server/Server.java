@@ -4,8 +4,9 @@ import controllers.Connection;
 import models.Host;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.apache.logging.log4j.ThreadContext;
 import server.configuration.Config;
-import application.Constants;
+import configuration.Constants;
 import server.controllers.CacheManager;
 import server.controllers.RequestHandler;
 import server.controllers.database.DataSource;
@@ -45,6 +46,7 @@ public class Server {
             Config config = server.getConfig(location);
 
             if (server.isValid(config)) {
+                ThreadContext.put("module", config.getName());
                 CacheManager.setLocal(config.getLocal());
                 server.addMembers(config);
                 DataSource.init(config);
@@ -55,11 +57,11 @@ public class Server {
                 server.setNodeWithOldOffsets();
 
                 //Joining to the network
-                logger.info(String.format("[%s] Listening on DATA/SYNC port %d.", config.getLocal().getAddress(), config.getLocal().getPort()));
-                System.out.printf("[%s] Listening on DATA/SYNC port %d.\n", config.getLocal().getAddress(), config.getLocal().getPort());
+                logger.info(String.format("[%s] Listening on port %d.", config.getLocal().getAddress(), config.getLocal().getPort()));
+                System.out.printf("[%s] Listening on port %d.\n", config.getLocal().getAddress(), config.getLocal().getPort());
 
                 //Starting thread to listen for the connections
-                Thread connectionThread = new Thread(() -> server.listen(config.getLocal().getAddress(), config.getLocal().getPort()));
+                Thread connectionThread = new Thread(() -> server.listen(config));
                 connectionThread.start();
             }
         }
@@ -159,13 +161,14 @@ public class Server {
     /**
      * Listen for the connections from other servers/client
      */
-    private void listen(String address, int port) {
+    private void listen(Config config) {
+        ThreadContext.put("module", config.getName());
         ServerSocket serverSocket;
 
         try {
-            serverSocket = new ServerSocket(port);
+            serverSocket = new ServerSocket(config.getLocal().getPort());
         } catch (IOException exception) {
-            logger.error(String.format("Fail to start the broker at the node %s: %d.", address, port), exception);
+            logger.error(String.format("Fail to start the broker at the node %s: %d.", config.getLocal().getAddress(), config.getLocal().getPort()), exception);
             return;
         }
 
@@ -175,11 +178,11 @@ public class Server {
                 logger.info(String.format("[%s:%d] Received the connection from the host.", socket.getInetAddress().getHostAddress(), socket.getPort()));
                 Connection connection = new Connection(socket, socket.getInetAddress().getHostAddress(), socket.getPort());
                 if (connection.openConnection()) {
-                    RequestHandler requestHandler = new RequestHandler(connection);
+                    RequestHandler requestHandler = new RequestHandler(config.getName(), connection);
                     threadPool.execute(requestHandler::process);
                 }
             } catch (IOException exception) {
-                logger.error(String.format("[%s:%d] Fail to accept the connection from another host. ", address, port), exception);
+                logger.error(String.format("[%s:%d] Fail to accept the connection from another host. ", config.getLocal().getAddress(), config.getLocal().getPort()), exception);
             }
         }
     }

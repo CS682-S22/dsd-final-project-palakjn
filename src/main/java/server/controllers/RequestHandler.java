@@ -1,11 +1,12 @@
 package server.controllers;
 
-import application.Constants;
+import configuration.Constants;
 import controllers.Connection;
 import controllers.NodeService;
 import models.Header;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.apache.logging.log4j.ThreadContext;
 import utils.PacketHandler;
 
 /**
@@ -18,11 +19,13 @@ public class RequestHandler {
     private Connection connection;
     private NodeService nodeService;
     private Broadcast broadcast;
+    private String name;
 
-    public RequestHandler(Connection connection) {
+    public RequestHandler(String name, Connection connection) {
         this.connection = connection;
         nodeService = new NodeService();
         broadcast = new Broadcast();
+        this.name = name;
     }
 
     /**
@@ -30,8 +33,10 @@ public class RequestHandler {
      */
     public void process() {
         boolean running = true;
+        ThreadContext.put("module", name);
 
         while (running && connection.isOpen()) {
+
             byte[] request = connection.receive();
 
             if (request != null) {

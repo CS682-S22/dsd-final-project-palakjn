@@ -1,6 +1,6 @@
 package server.controllers;
 
-import application.Constants;
+import configuration.Constants;
 import controllers.Connection;
 import controllers.NodeService;
 import models.Host;

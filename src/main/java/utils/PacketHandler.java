@@ -1,6 +1,6 @@
 package utils;
 
-import application.Constants;
+import configuration.Constants;
 import com.google.protobuf.InvalidProtocolBufferException;
 import models.Header;
 import models.Host;

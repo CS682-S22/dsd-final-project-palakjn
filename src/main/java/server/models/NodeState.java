@@ -1,6 +1,6 @@
 package server.models;
 
-import application.Constants;
+import configuration.Constants;
 
 /**
  * Holds the information of current status of the server

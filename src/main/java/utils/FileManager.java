@@ -26,7 +26,7 @@ public class FileManager {
     public static boolean write(byte[] logData, int fromOffset) {
         boolean isSuccess = false;
 
-        try (FileOutputStream outputStream = new FileOutputStream(location)) {
+        try (FileOutputStream outputStream = new FileOutputStream(location, true)) {
             outputStream.getChannel().position(fromOffset);
             outputStream.write(logData);
             outputStream.flush();

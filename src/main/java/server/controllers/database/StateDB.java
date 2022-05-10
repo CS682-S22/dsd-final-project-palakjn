@@ -78,10 +78,10 @@ public class StateDB {
      */
     private static void execute(NodeState nodeState, Connection con, String query) throws SQLException {
         PreparedStatement statement = con.prepareStatement(query);
-        statement.setInt(0, nodeState.getTerm());
-        statement.setInt(1, nodeState.getVotedFor());
-        statement.setInt(2, nodeState.getCommitLength());
-        statement.setInt(3, nodeState.getCurrentLeader());
+        statement.setInt(1, nodeState.getTerm());
+        statement.setInt(2, nodeState.getVotedFor());
+        statement.setInt(3, nodeState.getCommitLength());
+        statement.setInt(4, nodeState.getCurrentLeader());
 
         statement.executeUpdate();
     }

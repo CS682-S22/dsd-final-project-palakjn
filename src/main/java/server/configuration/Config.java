@@ -13,6 +13,8 @@ import java.util.List;
  */
 public class Config {
     @Expose
+    private String name;
+    @Expose
     private Host local;
     @Expose
     private List<Host> members;
@@ -24,6 +26,13 @@ public class Config {
     private String password;
     @Expose
     private String location;
+
+    /**
+     * Get the name of the server
+     */
+    public String getName() {
+        return name;
+    }
 
     /**
      * Get the detail of local running instance
@@ -98,7 +107,8 @@ public class Config {
                           !Strings.isNullOrEmpty(password) &&
                           members != null &&
                           members.size() > 0 &&
-                          !Strings.isNullOrEmpty(location);
+                          !Strings.isNullOrEmpty(location) &&
+                          !Strings.isNullOrEmpty(name);
 
         if (members != null) {
             for (Host member : members) {

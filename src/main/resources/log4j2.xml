@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="ALL">
+
+    <Properties>
+        <Property name="LOG_LOC">logs</Property>
+        <Property name="MAX">5</Property>
+        <Property name="LOG_PATTERN">%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} %class{0}.%method:%L - %msg%n</Property>
+    </Properties>
+
+
+    <Appenders>
+        <Routing name="Routing">
+            <Routes pattern="$${ctx:module}">
+                <Route key="$${ctx:module}">
+                    <RollingFile name="FILE" fileName="${LOG_LOC}/raw.log"
+                                 filePattern="${LOG_LOC}/raw.%i.log">
+                        <PatternLayout>
+                            <Pattern>${LOG_PATTERN}</Pattern>
+                        </PatternLayout>
+
+                        <Policies>
+                            <OnStartupTriggeringPolicy />
+                        </Policies>
+
+                        <DefaultRolloverStrategy max="${MAX}" />
+                    </RollingFile>
+                </Route>
+                <Route>
+                    <RollingFile name="RAW"
+                                 fileName="${LOG_LOC}/${ctx:module}.log"
+                                 filePattern="${LOG_LOC}/${ctx:module}.%i.log">
+                        <PatternLayout>
+                            <Pattern>${LOG_PATTERN}</Pattern>
+                        </PatternLayout>
+
+                        <Policies>
+                            <OnStartupTriggeringPolicy />
+                        </Policies>
+
+                        <DefaultRolloverStrategy max="${MAX}" />
+                    </RollingFile>
+                </Route>
+            </Routes>
+        </Routing>
+
+        <Console name="STDOUT" target="SYSTEM_OUT" follow="true">
+            <PatternLayout pattern="${LOG_PATTERN}" />
+        </Console>
+    </Appenders>
+
+    <Loggers>
+        <Logger name="com.roytuts" level="debug" />
+
+        <Logger name="org.springframework.web" level="info"
+                additivity="false" />
+
+        <Logger name="file" level="debug" additivity="false">
+            <appender-ref ref="Routing" />
+        </Logger>
+
+        <Root level="info">
+            <AppenderRef ref="Routing" />
+            <AppenderRef ref="STDOUT" />
+        </Root>
+    </Loggers>
+</Configuration>

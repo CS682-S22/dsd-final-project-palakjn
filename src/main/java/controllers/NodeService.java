@@ -1,6 +1,6 @@
 package controllers;
 
-import application.Constants;
+import configuration.Constants;
 import models.Host;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -43,6 +43,14 @@ public class NodeService {
      * Send negative acknowledgment response to the host
      */
     public void sendNACK(Connection connection, Constants.REQUESTER requester, int seqNum, Host destination) {
+        byte[] acknowledgement = PacketHandler.createNACK(requester, seqNum, destination);
+        connection.getDestination().send(acknowledgement);
+    }
+
+    /**
+     * Send acknowledgment response to the host
+     */
+    public void sendACK(Connection connection, Constants.REQUESTER requester, int seqNum, Host destination) {
         byte[] acknowledgement = PacketHandler.createACK(requester, seqNum, destination);
         connection.getDestination().send(acknowledgement);
     }

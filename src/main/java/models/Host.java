@@ -5,7 +5,7 @@ import controllers.Connection;
 import controllers.NodeService;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import application.Constants;
+import configuration.Constants;
 import server.controllers.CacheManager;
 import server.controllers.Channels;
 import utils.Strings;
@@ -35,6 +35,10 @@ public class Host {
     public Host(String address, int port) {
         this.address = address;
         this.port = port;
+        this.nodeService = new NodeService();
+    }
+
+    public Host() {
         this.nodeService = new NodeService();
     }
 
@@ -136,10 +140,6 @@ public class Host {
         Connection connection = Channels.get(toString());
 
         if (connection == null || !connection.isOpen()) {
-            connection = nodeService.connect(address, port);
-        }
-
-        if (connection != null && connection.isOpen()) {
             connection = nodeService.connect(address, port);
         }
 
