@@ -2,6 +2,7 @@ package consensus.controllers;
 
 import configuration.Constants;
 import consensus.models.AppendEntriesRequest;
+import consensus.models.AppendEntriesResponse;
 import controllers.Connection;
 import controllers.NodeService;
 import models.Header;
@@ -84,8 +85,8 @@ public class RequestHandler {
                                 Packet<?> packet = JSONDesrializer.fromJson(body, Packet.class);
 
                                 if (packet != null) {
-                                    if (packet.getType() == Constants.PACKET_TYPE.APPEND_ENTRIES.ordinal()) {
-
+                                    if (packet.getType() == Constants.PACKET_TYPE.APPEND_ENTRIES.ordinal() && packet.getObject() instanceof AppendEntriesResponse appendEntriesResponse) {
+                                        replication.processAcknowledgement(appendEntriesResponse);
                                     } else if (packet.getType() == Constants.PACKET_TYPE.VOTE.ordinal()) {
 
                                     }

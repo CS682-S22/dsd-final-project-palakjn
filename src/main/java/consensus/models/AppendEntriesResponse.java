@@ -12,10 +12,16 @@ public class AppendEntriesResponse {
     private int term;
     @Expose
     private int ack;
+    @Expose
+    private int nodeId;
+    @Expose
+    private boolean isSuccess;
 
-    public AppendEntriesResponse(int term, int ack) {
+    public AppendEntriesResponse(int term, int ack, int nodeId, boolean isSuccess) {
         this.term = term;
         this.ack = ack;
+        this.nodeId = nodeId;
+        this.isSuccess = isSuccess;
     }
 
     /**
@@ -30,5 +36,19 @@ public class AppendEntriesResponse {
      */
     public int getAck() {
         return ack;
+    }
+
+    /**
+     * Get the id of the node responding
+     */
+    public int getNodeId() {
+        return nodeId;
+    }
+
+    /**
+     * Set the id of the node responding
+     */
+    public boolean isSuccess() {
+        return isSuccess;
     }
 }

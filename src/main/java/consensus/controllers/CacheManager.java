@@ -265,7 +265,19 @@ public class CacheManager {
     public static void setSentLength(int nodeId, int length) {
         dataLock.writeLock().lock();
 
-        sentLength.set(nodeId, length);
+        sentLength.add(nodeId, length);
+
+        dataLock.writeLock().unlock();
+    }
+
+    /**
+     * Decrement sendLength of the given node by 1
+     */
+    public static void decrementSentLength(int nodeId) {
+        dataLock.writeLock().lock();
+
+        int length = sentLength.get(nodeId);
+        sentLength.add(nodeId, length - 1);
 
         dataLock.writeLock().unlock();
     }

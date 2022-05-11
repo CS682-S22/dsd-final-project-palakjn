@@ -28,7 +28,7 @@ public class Replication {
     /**
      * Start the timer to replicate the logs to followers if the current server is the leader
      */
-    public static void start() {
+    public static void startTimer() {
         timer = new Timer();
         TimerTask task = new TimerTask() {
             @Override
@@ -45,7 +45,7 @@ public class Replication {
                     restart();
                 } else {
                     logger.info(String.format("[%s] Server is not anymore leader. Stopping replicating logs to followers. Current role: %s", CacheManager.getLocal().toString(), Constants.ROLE.values()[CacheManager.getCurrentRole()].name()));
-                    stop();
+                    stopTimer();
                 }
             }
         };
@@ -57,14 +57,14 @@ public class Replication {
      * Restart the timer
      */
     public static void restart() {
-        stop();
-        start();
+        stopTimer();
+        startTimer();
     }
 
     /**
      * Stop the timer
      */
-    public static void stop() {
+    public static void stopTimer() {
         timer.cancel();
     }
 
@@ -80,6 +80,9 @@ public class Replication {
             CacheManager.setTerm(appendEntriesRequest.getTerm());
             CacheManager.setVoteFor(-1);
             //TODO: Cancel election timer
+        }
+
+        if (appendEntriesRequest.getTerm() == currentTerm) {
             CacheManager.setCurrentRole(Constants.ROLE.FOLLOWER.ordinal());
             CacheManager.setCurrentLeader(appendEntriesRequest.getLeaderId());
         }
@@ -87,25 +90,49 @@ public class Replication {
         boolean logOk = CacheManager.getLogLength() >= appendEntriesRequest.getPrefixLen() &&
                 (appendEntriesRequest.getPrefixLen() == 0 || CacheManager.getEntry(appendEntriesRequest.getPrefixLen() - 1).getTerm() == appendEntriesRequest.getPrefixTerm());
 
-        Packet<AppendEntriesResponse> packet;
+        int ack = 0;
+        boolean isSuccess = false;
 
         if (appendEntriesRequest.getTerm() == currentTerm && logOk) {
             logger.info(String.format("[%s] Accepted %d number of logs from leader %s. Writing to local logs if not duplicate", CacheManager.getLocal().toString(), appendEntriesRequest.getLength(), leader.toString()));
             writeLogs(appendEntriesRequest);
-            int ack = appendEntriesRequest.getPrefixLen() + appendEntriesRequest.getLength();
-            AppendEntriesResponse response = new AppendEntriesResponse(currentTerm, ack);
-            packet = new Packet<>(Constants.PACKET_TYPE.APPEND_ENTRIES.ordinal(), Constants.RESPONSE_STATUS.OK.ordinal(), response);
+            ack = appendEntriesRequest.getPrefixLen() + appendEntriesRequest.getLength();
+            isSuccess = true;
         } else {
-            AppendEntriesResponse response = new AppendEntriesResponse(currentTerm, 0);
-            packet = new Packet<>(Constants.PACKET_TYPE.APPEND_ENTRIES.ordinal(), Constants.RESPONSE_STATUS.NOT_OK.ordinal(), response);
             logger.warn(String.format("[%s] Rejecting the logs from the leader %s. CurrentTerm: %d, LeaderTerm: %d, log.length: %d," +
                     "prefixLen: %d, logs[prefixLen].term: %d, prefixTerm: %d", CacheManager.getLocal().toString(), leader.toString(), currentTerm, appendEntriesRequest.getTerm(),
                     CacheManager.getLogLength(), appendEntriesRequest.getPrefixLen(), CacheManager.getEntry(appendEntriesRequest.getPrefixLen() - 1).getTerm(), appendEntriesRequest.getPrefixTerm()));
         }
 
+        AppendEntriesResponse response = new AppendEntriesResponse(currentTerm, ack, CacheManager.getLocal().getId(), isSuccess);
+        Packet<AppendEntriesResponse> packet = new Packet<>(Constants.PACKET_TYPE.APPEND_ENTRIES.ordinal(), Constants.RESPONSE_STATUS.OK.ordinal(), response);
+        byte[] responseBytes = PacketHandler.createPacket(Constants.REQUESTER.SERVER, Constants.HEADER_TYPE.RESP, packet, 0, leader);
+        leader.send(responseBytes);
+    }
 
-        byte[] response = PacketHandler.createPacket(Constants.REQUESTER.SERVER, Constants.HEADER_TYPE.RESP, packet, 0, leader);
-        leader.send(response);
+    /**
+     * Receiving the acknowledgement from the follower
+     */
+    public void processAcknowledgement(AppendEntriesResponse appendEntriesResponse) {
+        Replication.stopTimer();
+        int currentTerm = CacheManager.getTerm();
+
+        if (appendEntriesResponse.getTerm() == currentTerm && CacheManager.getCurrentRole() == Constants.ROLE.LEADER.ordinal()) {
+            if (appendEntriesResponse.isSuccess() && appendEntriesResponse.getAck() >= CacheManager.getAckedLength(appendEntriesResponse.getNodeId())) {
+                CacheManager.setSentLength(appendEntriesResponse.getNodeId(), appendEntriesResponse.getAck());
+                CacheManager.setAckedLength(appendEntriesResponse.getNodeId(), appendEntriesResponse.getAck());
+                //TODO: commitLogEntries()
+            } else if (CacheManager.getSentLength(appendEntriesResponse.getNodeId()) > 0) {
+                CacheManager.decrementSentLength(appendEntriesResponse.getNodeId());
+            }
+        } else if (appendEntriesResponse.getTerm() > currentTerm) {
+            CacheManager.setTerm(appendEntriesResponse.getTerm());
+            CacheManager.setCurrentRole(Constants.ROLE.FOLLOWER.ordinal());
+            CacheManager.setVoteFor(-1);
+            //TODO: Cancel Election timer
+        }
+
+        Replication.startTimer();
     }
 
     /**
