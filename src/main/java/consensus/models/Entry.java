@@ -1,5 +1,7 @@
 package consensus.models;
 
+import com.google.gson.annotations.Expose;
+
 /**
  * Responsible for holding the information about the log stored at the log index.
  * For example: term - when the log was being written
@@ -9,11 +11,17 @@ package consensus.models;
  * @author Palak Jain
  */
 public class Entry {
+    @Expose
     private int term;
+    @Expose
     private int fromOffset;
+    @Expose
     private int toOffset;
+    @Expose
     private String clientId;
+    @Expose
     private int receivedOffset;
+    @Expose
     private byte[] data;
 
     public Entry(int term, int fromOffset, int toOffset, String clientId, int receivedOffset) {

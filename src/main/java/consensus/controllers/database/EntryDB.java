@@ -1,5 +1,6 @@
 package consensus.controllers.database;
 
+import consensus.controllers.CacheManager;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import consensus.models.Entry;
@@ -24,7 +25,7 @@ public class EntryDB {
      */
     public static void insert(Entry entry) {
         try (Connection connection = DataSource.getConnection()) {
-            String query = "INSERT INTO entries VALUES (?, ?, ?, ?, ?)";
+            String query = "INSERT INTO entries VALUES (?, ?, ?, ?, ?, ?)";
 
             PreparedStatement statement = connection.prepareStatement(query);
             statement.setInt(1, entry.getTerm());
@@ -32,6 +33,7 @@ public class EntryDB {
             statement.setInt(3, entry.getToOffset());
             statement.setString(4, entry.getClientId());
             statement.setInt(5, entry.getReceivedOffset());
+            statement.setInt(6, CacheManager.getLocal().getId());
 
             statement.executeUpdate();
         } catch (SQLException sqlException) {
@@ -44,10 +46,11 @@ public class EntryDB {
      */
     public static void deleteFrom(int fromOffset) {
         try (Connection connection = DataSource.getConnection()) {
-            String query = "DELETE FROM entries WHERE fromOffset >= ?";
+            String query = "DELETE FROM entries WHERE fromOffset >= ? and serverId = ?";
 
             PreparedStatement statement = connection.prepareStatement(query);
             statement.setInt(1, fromOffset);
+            statement.setInt(2, CacheManager.getLocal().getId());
 
             statement.executeUpdate();
         } catch (SQLException sqlException) {
@@ -62,10 +65,11 @@ public class EntryDB {
         List<Entry> entries = null;
 
         try (Connection connection = DataSource.getConnection()) {
-            String query = "SELECT * from entries WHERE fromOffset >= ?";
+            String query = "SELECT * from entries WHERE fromOffset >= ? and serverId = ?";
 
             PreparedStatement statement = connection.prepareStatement(query);
             statement.setInt(1, fromOffset);
+            statement.setInt(2, CacheManager.getLocal().getId());
 
             ResultSet resultSet = statement.executeQuery();
             while (resultSet.next()) {
@@ -73,7 +77,7 @@ public class EntryDB {
                                     resultSet.getInt("fromOffset"),
                                     resultSet.getInt("toOffset"),
                                     resultSet.getString("clientId"),
-                                    resultSet.getInt("receivedOffset"));
+                                    resultSet.getInt("clientOffset"));
                 if (entries == null) { entries = new ArrayList<>(); }
                 entries.add(entry);
             }

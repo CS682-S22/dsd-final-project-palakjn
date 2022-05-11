@@ -38,30 +38,33 @@ public class Broadcast {
                         //Updating acknowledgement of the packets received by current leader
                         CacheManager.setAckedLength(CacheManager.getLocal().getId(), CacheManager.getLogLength());
                         logger.info(String.format("[%s] Server added client %s log with seqNum %d.", CacheManager.getLocal().toString(), connection.getDestination().toString(), seqNum));
+
+                        //TODO: remove this as this is only for testing
+                        nodeService.sendACK(connection, Constants.REQUESTER.SERVER, seqNum);
                     } else {
                         logger.warn(String.format("[%s] Not able to write log with the offset %d from the client %s.", CacheManager.getLocal().toString(), seqNum, connection.getDestination().toString()));
-                        nodeService.sendNACK(connection, Constants.REQUESTER.SERVER, seqNum, connection.getDestination());
+                        nodeService.sendNACK(connection, Constants.REQUESTER.SERVER, seqNum);
                     }
                 } else if (CacheManager.getCurrentRole() == Constants.ROLE.FOLLOWER.ordinal()) {
                     Host leader = null;
                     int leaderId = CacheManager.getCurrentLeader();
 
                     if (leaderId != -1) {
-                        leader = CacheManager.getMember(leaderId);
+                        leader = CacheManager.getNeighbor(leaderId);
                     }
 
                     if (leader != null) {
                         logger.info(String.format("[%s] [Follower] Received the log from client %s. Sending leader %s information to the client.", CacheManager.getLocal().toString(), connection.getDestination().toString(), leader.toString()));
-                        Packet<Host> response = new Packet<>(Constants.PACKET_TYPE.RESP.ordinal(), Constants.RESPONSE_STATUS.REDIRECT.ordinal(), leader);
+                        Packet<Host> response = new Packet<>(Constants.RESPONSE_STATUS.REDIRECT.ordinal(), leader);
                         byte[] responseBytes = PacketHandler.createPacket(Constants.REQUESTER.SERVER, Constants.HEADER_TYPE.RESP, response, seqNum, connection.getDestination());
                         connection.getDestination().send(responseBytes);
                     } else {
                         logger.warn(String.format("[%s] Leader information not found. Sending NACK to the client %s.", CacheManager.getLocal().toString(), connection.getDestination().toString()));
-                        nodeService.sendNACK(connection, Constants.REQUESTER.SERVER, seqNum, connection.getDestination());
+                        nodeService.sendNACK(connection, Constants.REQUESTER.SERVER, seqNum);
                     }
                 } else if (CacheManager.getCurrentRole() == Constants.ROLE.CANDIDATE.ordinal()) {
-                    logger.warn(String.format("[%s] Server found the crash of the leader. In ELECTION mode. Sending NACK to the client %s.", CacheManager.getLocal().toString(), connection.getDestination().toString()));
-                    Packet<?> response = new Packet<>(Constants.PACKET_TYPE.RESP.ordinal(), 0, Constants.RESPONSE_STATUS.ELECTION.ordinal());
+                    logger.warn(String.format("[%s] Server found the crash of the leader. In ELECTION mode. Sending ELECTION to the client %s.", CacheManager.getLocal().toString(), connection.getDestination().toString()));
+                    Packet<?> response = new Packet<>(Constants.RESPONSE_STATUS.ELECTION.ordinal());
                     byte[] responseBytes = PacketHandler.createPacket(Constants.REQUESTER.SERVER, Constants.HEADER_TYPE.RESP, response, seqNum, connection.getDestination());
                     connection.getDestination().send(responseBytes);
                 }

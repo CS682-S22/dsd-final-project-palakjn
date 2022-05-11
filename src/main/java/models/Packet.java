@@ -15,35 +15,17 @@ import java.nio.charset.StandardCharsets;
  */
 public class Packet<T> {
     @Expose
-    private int type;
-    @Expose
     private int status;
     @Expose
     private T object;
 
-    public Packet(int type, int status, T object) {
-        this.type = type;
+    public Packet(int status, T object) {
         this.status = status;
         this.object = object;
     }
 
-    public Packet(int type, int status) {
-        this.type = type;
+    public Packet(int status) {
         this.status = status;
-    }
-
-    /**
-     * Get the type of the packet
-     */
-    public int getType() {
-        return type;
-    }
-
-    /**
-     * Set the type of the packet
-     */
-    public void setType(int type) {
-        this.type = type;
     }
 
     /**

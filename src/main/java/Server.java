@@ -1,5 +1,4 @@
-package consensus;
-
+import consensus.controllers.Replication;
 import controllers.Connection;
 import models.Host;
 import org.apache.logging.log4j.LogManager;
@@ -46,7 +45,7 @@ public class Server {
             Config config = server.getConfig(location);
 
             if (server.isValid(config)) {
-                ThreadContext.put("module", config.getName());
+                ThreadContext.put("module", config.getLocal().getName());
                 CacheManager.setLocal(config.getLocal());
                 server.addMembers(config);
                 DataSource.init(config);
@@ -55,6 +54,13 @@ public class Server {
                 //Getting data from disk to get the details of status of the nodes before crash
                 server.setNodeStatus();
                 server.setNodeWithOldOffsets();
+                CacheManager.initSentAndAckLength();
+
+                //TODO: Remove this as this is for testing
+                if (config.getLocal().getName().equals("Server1")) {
+                    CacheManager.setCurrentRole(Constants.ROLE.LEADER.ordinal());
+                    Replication.startTimer();
+                }
 
                 //Joining to the network
                 logger.info(String.format("[%s] Listening on port %d.", config.getLocal().getAddress(), config.getLocal().getPort()));
@@ -162,7 +168,7 @@ public class Server {
      * Listen for the connections from other servers/client
      */
     private void listen(Config config) {
-        ThreadContext.put("module", config.getName());
+        ThreadContext.put("module", config.getLocal().getName());
         ServerSocket serverSocket;
 
         try {
@@ -178,7 +184,7 @@ public class Server {
                 logger.info(String.format("[%s:%d] Received the connection from the host.", socket.getInetAddress().getHostAddress(), socket.getPort()));
                 Connection connection = new Connection(socket, socket.getInetAddress().getHostAddress(), socket.getPort());
                 if (connection.openConnection()) {
-                    RequestHandler requestHandler = new RequestHandler(config.getName(), connection);
+                    RequestHandler requestHandler = new RequestHandler(connection);
                     threadPool.execute(requestHandler::process);
                 }
             } catch (IOException exception) {

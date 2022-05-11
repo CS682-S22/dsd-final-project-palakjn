@@ -1,5 +1,6 @@
 package consensus.controllers;
 
+import com.google.gson.reflect.TypeToken;
 import configuration.Constants;
 import consensus.models.AppendEntriesRequest;
 import consensus.models.AppendEntriesResponse;
@@ -24,14 +25,12 @@ public class RequestHandler {
     private NodeService nodeService;
     private Broadcast broadcast;
     private Replication replication;
-    private String name;
 
-    public RequestHandler(String name, Connection connection) {
+    public RequestHandler(Connection connection) {
         this.connection = connection;
         nodeService = new NodeService();
         broadcast = new Broadcast();
         replication = new Replication();
-        this.name = name;
     }
 
     /**
@@ -39,7 +38,7 @@ public class RequestHandler {
      */
     public void process() {
         boolean running = true;
-        ThreadContext.put("module", name);
+        ThreadContext.put("module", CacheManager.getLocal().getName());
 
         while (running && connection.isOpen()) {
 
@@ -57,44 +56,34 @@ public class RequestHandler {
                             broadcast.process(connection, requestOrResponse, header.getSeqNum());
                         } else {
                             logger.info(String.format("[%s] Received invalid %d requestOrResponse type from client: %s.", CacheManager.getLocal().toString(), header.getType(), connection.getDestination().toString()));
-                            nodeService.sendNACK(connection, Constants.REQUESTER.SERVER, header.getSeqNum(), connection.getDestination());
+                            nodeService.sendNACK(connection, Constants.REQUESTER.SERVER, header.getSeqNum());
                         }
                     } else if (header.getRequester() == Constants.REQUESTER.SERVER.ordinal()) {
-                        if (header.getType() == Constants.HEADER_TYPE.REQ.ordinal()) {
-                            logger.info(String.format("[%s] Received REG requestOrResponse from server: %s.", CacheManager.getLocal().toString(), connection.getDestination().toString()));
+                        byte[] body = PacketHandler.getData(requestOrResponse);
 
-                            byte[] body = PacketHandler.getData(requestOrResponse);
+                        if (body != null) {
+                            if (header.getType() == Constants.HEADER_TYPE.ENTRY_REQ.ordinal()) {
+                                logger.info(String.format("[%s] Received AppendEntry request packet from leader: %s.", CacheManager.getLocal().toString(), connection.getDestination().toString()));
 
-                            if (body != null) {
-                                Packet<?> packet = JSONDesrializer.fromJson(body, Packet.class);
-
+                                Packet<AppendEntriesRequest> packet = JSONDesrializer.deserializePacket(body, new TypeToken<Packet<AppendEntriesRequest>>(){}.getType());
                                 if (packet != null) {
-                                    if (packet.getType() == Constants.PACKET_TYPE.APPEND_ENTRIES.ordinal() && packet.getObject() instanceof AppendEntriesRequest appendEntriesRequest) {
-                                        replication.appendEntries(appendEntriesRequest);
-                                    } else if (packet.getType() == Constants.PACKET_TYPE.VOTE.ordinal()) {
-
-                                    }
+                                    replication.appendEntries(packet.getObject());
                                 }
-                            }
-                        } else if (header.getType() == Constants.HEADER_TYPE.RESP.ordinal()) {
-                            logger.info(String.format("[%s] Received RESP response from server: %s.", CacheManager.getLocal().toString(), connection.getDestination().toString()));
+                            } else if (header.getType() == Constants.HEADER_TYPE.ENTRY_RESP.ordinal()) {
+                                logger.info(String.format("[%s] Received AppendEntry response packet from follower: %s.", CacheManager.getLocal().toString(), connection.getDestination().toString()));
 
-                            byte[] body = PacketHandler.getData(requestOrResponse);
-
-                            if (body != null) {
-                                Packet<?> packet = JSONDesrializer.fromJson(body, Packet.class);
-
+                                Packet<AppendEntriesResponse> packet = JSONDesrializer.deserializePacket(body, new TypeToken<Packet<AppendEntriesResponse>>(){}.getType());
                                 if (packet != null) {
-                                    if (packet.getType() == Constants.PACKET_TYPE.APPEND_ENTRIES.ordinal() && packet.getObject() instanceof AppendEntriesResponse appendEntriesResponse) {
-                                        replication.processAcknowledgement(appendEntriesResponse);
-                                    } else if (packet.getType() == Constants.PACKET_TYPE.VOTE.ordinal()) {
-
-                                    }
+                                    replication.processAcknowledgement(packet.getObject());
                                 }
+                            } else if (header.getType() == Constants.HEADER_TYPE.VOTE_REQ.ordinal()) {
+
+                            } else if (header.getType() == Constants.HEADER_TYPE.VOTE_RESP.ordinal()) {
+
+                            } else {
+                                logger.info(String.format("[%s] Received invalid %d header type from server: %s.", CacheManager.getLocal().toString(), header.getType(), connection.getDestination().toString()));
+                                nodeService.sendNACK(connection, Constants.REQUESTER.SERVER, header.getSeqNum());
                             }
-                        } else {
-                            logger.info(String.format("[%s] Received invalid %d requestOrResponse type from server: %s.", CacheManager.getLocal().toString(), header.getType(), connection.getDestination().toString()));
-                            nodeService.sendNACK(connection, Constants.REQUESTER.SERVER, header.getSeqNum(), connection.getDestination());
                         }
                     }
                 }

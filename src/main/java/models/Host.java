@@ -22,14 +22,17 @@ public class Host {
     private String address;
     @Expose
     private int port;
+    @Expose
+    private String name;
     private NodeService nodeService;
     private final Logger logger = LogManager.getLogger(Host.class);
 
-    public Host(int id, String address, int port) {
+    public Host(int id, String address, int port, String name) {
         this.id = id;
         this.address = address;
         this.port = port;
         this.nodeService = new NodeService();
+        this.name = name;
     }
 
     public Host(String address, int port) {
@@ -82,6 +85,13 @@ public class Host {
      */
     public void setPort(int port) {
         this.port = port;
+    }
+
+    /**
+     * Get the name of the host
+     */
+    public String getName() {
+        return name;
     }
 
     /**

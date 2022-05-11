@@ -1,5 +1,3 @@
-package application;
-
 import application.configuration.Config;
 import application.controllers.Producer;
 import configuration.Constants;
@@ -45,7 +43,7 @@ public class Client {
             Config config = client.getConfig(location);
 
             if (client.isValid(config)) {
-                ThreadContext.put("module", config.getName());
+                ThreadContext.put("module", config.getLocal().getName());
                 CacheManager.setLocal(config.getLocal());
                 FileManager.init(config.getLocation());
                 client.producer = new Producer(config);

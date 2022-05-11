@@ -11,20 +11,11 @@ import utils.Strings;
  */
 public class Config {
     @Expose
-    private String name;
-    @Expose
     private Host local;
     @Expose
     private Host leader;
     @Expose
     private String location;
-
-    /**
-     * Get the name of the client (for logging)
-     */
-    public String getName() {
-        return name;
-    }
 
     /**
      * Get the details of local client
@@ -58,8 +49,7 @@ public class Config {
      * Checks whether the values given by client is valid or not
      */
     public boolean isValid() {
-        return !Strings.isNullOrEmpty(name) &&
-                local != null && local.isValid() &&
+        return  local != null && local.isValid() &&
                 leader != null && leader.isValid() &&
                 !Strings.isNullOrEmpty(location);
     }

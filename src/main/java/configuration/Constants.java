@@ -30,13 +30,11 @@ public class Constants {
         RESP,
         DATA,
         ACK,
-        NACK
-    }
-
-    public enum PACKET_TYPE {
-        VOTE,
-        APPEND_ENTRIES,
-        RESP
+        NACK,
+        VOTE_REQ,
+        VOTE_RESP,
+        ENTRY_REQ,
+        ENTRY_RESP
     }
 
     public enum RESPONSE_STATUS {

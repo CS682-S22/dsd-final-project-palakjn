@@ -64,7 +64,7 @@ public class CacheManager {
     /**
      * Get the member with the given id
      */
-    public static Host getMember(int id) {
+    public static Host getNeighbor(int id) {
         memberLock.readLock().lock();
 
         try {
@@ -85,6 +85,19 @@ public class CacheManager {
         } finally {
             memberLock.readLock().unlock();
         }
+    }
+
+    /**
+     * Get the number of members in the system
+     */
+    public static int getMemberCount() {
+        memberLock.readLock().lock();
+        int count = 1; //Counting for itself
+
+        count += members.getCount();
+
+        memberLock.readLock().unlock();
+        return count;
     }
 
     /**
@@ -271,6 +284,22 @@ public class CacheManager {
     }
 
     /**
+     * Initialize sentLength and ackLength with 0 for the given number of entries
+     */
+    public static void initSentAndAckLength() {
+        dataLock.writeLock().lock();
+
+        int count = getMemberCount();
+
+        for (int index = 0; index < count; index++) {
+            sentLength.add(0);
+            ackedLength.add(0);
+        }
+
+        dataLock.writeLock().unlock();
+    }
+
+    /**
      * Decrement sendLength of the given node by 1
      */
     public static void decrementSentLength(int nodeId) {
@@ -419,6 +448,7 @@ public class CacheManager {
             entry = entries.get(index);
         }
 
+        dataLock.readLock().unlock();
         return entry;
     }
 

@@ -69,4 +69,11 @@ public class Members {
     public List<Host> getNeighbors() {
         return members.values().stream().toList();
     }
+
+    /**
+     * Get the number of neighbors
+     */
+    public int getCount() {
+        return members.size();
+    }
 }

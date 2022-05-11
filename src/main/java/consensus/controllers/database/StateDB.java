@@ -1,5 +1,6 @@
 package consensus.controllers.database;
 
+import consensus.controllers.CacheManager;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import consensus.models.NodeState;
@@ -25,9 +26,16 @@ public class StateDB {
 
         if (state == null) {
             try (Connection con = DataSource.getConnection()) {
-                String query = "INSERT into state VALUES (0, ?, ?, ?, ?);";
+                String query = "INSERT into state VALUES (?, ?, ?, ?, ?);";
 
-                execute(nodeState, con, query);
+                PreparedStatement statement = con.prepareStatement(query);
+                statement.setInt(1, CacheManager.getLocal().getId());
+                statement.setInt(2, nodeState.getTerm());
+                statement.setInt(3, nodeState.getVotedFor());
+                statement.setInt(4, nodeState.getCommitLength());
+                statement.setInt(5, nodeState.getCurrentLeader());
+
+                statement.executeUpdate();
             } catch (SQLException sqlException) {
                 logger.error(String.format("Error while inserting event %s to the table. \n", nodeState.toString()), sqlException);
             }
@@ -43,8 +51,9 @@ public class StateDB {
         NodeState nodeState = null;
 
         try (Connection connection = DataSource.getConnection()) {
-            String query = "SELECT * FROM state where id = 0";
+            String query = "SELECT * FROM state where id = ?";
             PreparedStatement statement = connection.prepareStatement(query);
+            statement.setInt(1, CacheManager.getLocal().getId());
             ResultSet resultSet = statement.executeQuery();
 
             while (resultSet.next()) {
@@ -65,9 +74,16 @@ public class StateDB {
      */
     public static void update(NodeState nodeState) {
         try (Connection connection = DataSource.getConnection()) {
-            String query = "UPDATE state SET term = ?, votedFor = ?, commitLength = ?, leader = ? WHERE id = 0";
+            String query = "UPDATE state SET term = ?, votedFor = ?, commitLength = ?, leader = ? WHERE id = ?";
 
-            execute(nodeState, connection, query);
+            PreparedStatement statement = connection.prepareStatement(query);
+            statement.setInt(1, nodeState.getTerm());
+            statement.setInt(2, nodeState.getVotedFor());
+            statement.setInt(3, nodeState.getCommitLength());
+            statement.setInt(4, nodeState.getCurrentLeader());
+            statement.setInt(5, CacheManager.getLocal().getId());
+
+            statement.executeUpdate();
         } catch (SQLException sqlException) {
             logger.error("Error while updating the state of the node", sqlException);
         }
@@ -77,12 +93,6 @@ public class StateDB {
      * Setting the status values at the appropriate places in prepared statement
      */
     private static void execute(NodeState nodeState, Connection con, String query) throws SQLException {
-        PreparedStatement statement = con.prepareStatement(query);
-        statement.setInt(1, nodeState.getTerm());
-        statement.setInt(2, nodeState.getVotedFor());
-        statement.setInt(3, nodeState.getCommitLength());
-        statement.setInt(4, nodeState.getCurrentLeader());
 
-        statement.executeUpdate();
     }
 }

@@ -8,6 +8,7 @@ import models.Host;
 import models.Packet;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.apache.logging.log4j.ThreadContext;
 import utils.FileManager;
 import utils.PacketHandler;
 
@@ -33,6 +34,7 @@ public class Replication {
         TimerTask task = new TimerTask() {
             @Override
             public void run() {
+                ThreadContext.put("module", CacheManager.getLocal().getName());
                 if (CacheManager.getCurrentRole() == Constants.ROLE.LEADER.ordinal()) {
                     int currentTerm = CacheManager.getTerm();
                     List<Host> followers = CacheManager.getNeighbors();
@@ -73,7 +75,7 @@ public class Replication {
      */
     public void appendEntries(AppendEntriesRequest appendEntriesRequest) {
         int currentTerm = CacheManager.getTerm();
-        Host leader = CacheManager.getMember(appendEntriesRequest.getLeaderId());
+        Host leader = CacheManager.getNeighbor(appendEntriesRequest.getLeaderId());
 
         if (appendEntriesRequest.getTerm() > currentTerm) {
             logger.info(String.format("[%s] Received AppendEntries from new leader %s with the new term %d. Old term: %d", CacheManager.getLocal().toString(), leader.toString(), appendEntriesRequest.getTerm(), currentTerm));
@@ -105,8 +107,8 @@ public class Replication {
         }
 
         AppendEntriesResponse response = new AppendEntriesResponse(currentTerm, ack, CacheManager.getLocal().getId(), isSuccess);
-        Packet<AppendEntriesResponse> packet = new Packet<>(Constants.PACKET_TYPE.APPEND_ENTRIES.ordinal(), Constants.RESPONSE_STATUS.OK.ordinal(), response);
-        byte[] responseBytes = PacketHandler.createPacket(Constants.REQUESTER.SERVER, Constants.HEADER_TYPE.RESP, packet, 0, leader);
+        Packet<AppendEntriesResponse> packet = new Packet<>(Constants.RESPONSE_STATUS.OK.ordinal(), response);
+        byte[] responseBytes = PacketHandler.createPacket(Constants.REQUESTER.SERVER, Constants.HEADER_TYPE.ENTRY_RESP, packet, 0, leader);
         leader.send(responseBytes);
     }
 
@@ -114,32 +116,36 @@ public class Replication {
      * Receiving the acknowledgement from the follower
      */
     public void processAcknowledgement(AppendEntriesResponse appendEntriesResponse) {
-        Replication.stopTimer();
         int currentTerm = CacheManager.getTerm();
 
+        Host follower = CacheManager.getNeighbor(appendEntriesResponse.getNodeId());
         if (appendEntriesResponse.getTerm() == currentTerm && CacheManager.getCurrentRole() == Constants.ROLE.LEADER.ordinal()) {
-            if (appendEntriesResponse.isSuccess() && appendEntriesResponse.getAck() >= CacheManager.getAckedLength(appendEntriesResponse.getNodeId())) {
-                CacheManager.setSentLength(appendEntriesResponse.getNodeId(), appendEntriesResponse.getAck());
-                CacheManager.setAckedLength(appendEntriesResponse.getNodeId(), appendEntriesResponse.getAck());
+            if (appendEntriesResponse.isSuccess() && appendEntriesResponse.getAck() >= CacheManager.getAckedLength(follower.getId())) {
+                logger.info(String.format("[%s] Received an acknowledgement from the follower %s that it has received the total of %d logs till now.", CacheManager.getLocal().toString(), follower.getId(), appendEntriesResponse.getAck()));
+                CacheManager.setSentLength(follower.getId(), appendEntriesResponse.getAck());
+                CacheManager.setAckedLength(follower.getId(), appendEntriesResponse.getAck());
                 //TODO: commitLogEntries()
             } else if (CacheManager.getSentLength(appendEntriesResponse.getNodeId()) > 0) {
-                CacheManager.decrementSentLength(appendEntriesResponse.getNodeId());
+                logger.info(String.format("[%s] Need to repair the logs with the follower %s as follower is behind the prefix logs. " +
+                        "Previously sent logs from %d position. Now, sending from %d position.", CacheManager.getLocal().toString(), follower.toString(), CacheManager.getSentLength(currentTerm), CacheManager.getSentLength(currentTerm) - 1));
+                CacheManager.decrementSentLength(follower.getId());
             }
         } else if (appendEntriesResponse.getTerm() > currentTerm) {
+            logger.info(String.format("[%s] Leader's term %d is less that follower %s's term %d. Seems that there is a new leader in the system. " +
+                    "Changing role to follower.", CacheManager.getLocal().toString(), currentTerm, follower.toString(), appendEntriesResponse.getTerm()));
             CacheManager.setTerm(appendEntriesResponse.getTerm());
             CacheManager.setCurrentRole(Constants.ROLE.FOLLOWER.ordinal());
             CacheManager.setVoteFor(-1);
             //TODO: Cancel Election timer
+            //TODO: Start failure detection timer
         }
-
-        Replication.startTimer();
     }
 
     /**
      * Write the logs received from leader to local
      */
     private void writeLogs(AppendEntriesRequest appendEntriesRequest) {
-        Host leader = CacheManager.getMember(appendEntriesRequest.getLeaderId());
+        Host leader = CacheManager.getNeighbor(appendEntriesRequest.getLeaderId());
         int index = 0;
 
         if (appendEntriesRequest.getLength() > 0 && CacheManager.getLogLength() > appendEntriesRequest.getPrefixLen()) {
@@ -161,7 +167,8 @@ public class Replication {
         if ((appendEntriesRequest.getPrefixLen() + appendEntriesRequest.getLength()) > CacheManager.getLogLength()) {
             while (index < appendEntriesRequest.getLength()) {
                 Entry entry = appendEntriesRequest.getSuffix(index);
-                if(CacheManager.addEntry(entry.getData(), null, -1)) {
+
+                if(CacheManager.addEntry(entry.getData(), entry.getClientId(), entry.getReceivedOffset())) {
                     logger.info(String.format("[%s] Saved %d bytes of data from leader %s.", CacheManager.getLocal().toString(), entry.getData().length, leader.toString()));
                 } else {
                     logger.warn(String.format("[%s] Fail to write %d bytes of data from leader %s.", CacheManager.getLocal().toString(), entry.getData().length, leader.toString()));
@@ -215,9 +222,9 @@ public class Replication {
         }
 
         AppendEntriesRequest appendEntriesRequest = new AppendEntriesRequest(CacheManager.getLocal().getId(), currentTerm, prefixLen, prefixTerm, CacheManager.getCommitLength(), suffix);
-        Packet<AppendEntriesRequest> packet = new Packet<>(Constants.PACKET_TYPE.APPEND_ENTRIES.ordinal(), Constants.RESPONSE_STATUS.OK.ordinal(), appendEntriesRequest);
+        Packet<AppendEntriesRequest> packet = new Packet<>(Constants.RESPONSE_STATUS.OK.ordinal(), appendEntriesRequest);
 
-        follower.send(PacketHandler.createPacket(Constants.REQUESTER.SERVER, Constants.HEADER_TYPE.REQ, packet, 0, follower));
+        follower.send(PacketHandler.createPacket(Constants.REQUESTER.SERVER, Constants.HEADER_TYPE.ENTRY_REQ, packet, 0, follower));
         logger.info(String.format("[%s] Send AppendEntries packet to the follower %s with %d new logs [PrefixLen: %d. PrefixTerm: %d].", CacheManager.getLocal().toString(), follower.toString(), suffix.size(), prefixLen, prefixTerm));
     }
 }

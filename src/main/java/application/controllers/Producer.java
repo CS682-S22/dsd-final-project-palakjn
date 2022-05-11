@@ -2,6 +2,7 @@ package application.controllers;
 
 import application.configuration.Config;
 import configuration.Constants;
+import consensus.controllers.CacheManager;
 import controllers.Connection;
 import models.Header;
 import models.Host;
@@ -42,7 +43,7 @@ public class Producer {
      * Listen for the response either from consumer service/leader of the consensus system
      */
     public void listenForResponse(Connection connection) {
-        ThreadContext.put("module", config.getName());
+        ThreadContext.put("module", config.getLocal().getName());
 
         while (connection.isOpen()) {
             byte[] data = connection.receive();
