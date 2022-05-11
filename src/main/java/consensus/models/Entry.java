@@ -14,6 +14,7 @@ public class Entry {
     private int toOffset;
     private String clientId;
     private int receivedOffset;
+    private byte[] data;
 
     public Entry(int term, int fromOffset, int toOffset, String clientId, int receivedOffset) {
         this.term = term;
@@ -21,6 +22,15 @@ public class Entry {
         this.toOffset = toOffset;
         this.clientId = clientId;
         this.receivedOffset = receivedOffset;
+    }
+
+    public Entry(Entry entry) {
+        this.term = entry.getTerm();
+        this.fromOffset = entry.getFromOffset();
+        this.toOffset = entry.getToOffset();
+        this.clientId = entry.getClientId();
+        this.receivedOffset = entry.getReceivedOffset();
+        this.data = entry.getData();
     }
 
     /**
@@ -91,6 +101,20 @@ public class Entry {
      */
     public void setReceivedOffset(int receivedOffset) {
         this.receivedOffset = receivedOffset;
+    }
+
+    /**
+     * Get the content of the log
+     */
+    public byte[] getData() {
+        return data;
+    }
+
+    /**
+     * Set the content of the log
+     */
+    public void setData(byte[] data) {
+        this.data = data;
     }
 
     @Override

@@ -6,6 +6,7 @@ import consensus.controllers.database.EntryDB;
 import consensus.models.Entry;
 import consensus.models.NodeState;
 import utils.FileManager;
+import utils.Strings;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -246,7 +247,7 @@ public class CacheManager {
         while (lastIndex >= 0) {
             Entry entry = entries.get(lastIndex);
 
-            if (entry.getClientId().equals(clientId)) {
+            if (!Strings.isNullOrEmpty(entry.getClientId()) && entry.getReceivedOffset() != -1 && entry.getClientId().equals(clientId)) {
                 clientOffset = entry.getReceivedOffset();
                 break;
             }
@@ -415,11 +416,9 @@ public class CacheManager {
     public static void removeEntryFrom(int index) {
         dataLock.writeLock().lock();
 
-        //TODO: Get the fromOffset from the entry at the given index
-
+        int fromOffset = entries.get(index).getFromOffset();
         entries.subList(index, entries.size() - 1).clear();
-
-        //TODO: Removing these entries from SQL table
+        EntryDB.deleteFrom(fromOffset);
 
         dataLock.writeLock().unlock();
     }

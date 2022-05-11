@@ -42,6 +42,7 @@ public class Constants {
     public enum RESPONSE_STATUS {
         OK,
         REDIRECT,
-        ELECTION
+        ELECTION,
+        NOT_OK
     }
 }

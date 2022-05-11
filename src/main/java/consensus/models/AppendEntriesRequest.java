@@ -5,11 +5,11 @@ import com.google.gson.annotations.Expose;
 import java.util.List;
 
 /**
- * Holds all the information to be passed as part of REPLICA to the follower.
+ * Holds all the information to be passed as part of REPLICA data to the follower.
  *
  * @author Palak Jain
  */
-public class AppendEntries {
+public class AppendEntriesRequest {
     @Expose
     public int leaderId;
     @Expose
@@ -21,9 +21,9 @@ public class AppendEntries {
     @Expose
     public int commitLength;
     @Expose
-    public List<byte[]> suffix;
+    public List<Entry> suffix;
 
-    public AppendEntries(int leaderId, int term, int prefixLen, int prefixTerm, int commitLength, List<byte[]> suffix) {
+    public AppendEntriesRequest(int leaderId, int term, int prefixLen, int prefixTerm, int commitLength, List<Entry> suffix) {
         this.leaderId = leaderId;
         this.term = term;
         this.prefixLen = prefixLen;
@@ -40,24 +40,10 @@ public class AppendEntries {
     }
 
     /**
-     * Set the id of the leader
-     */
-    public void setLeaderId(int leaderId) {
-        this.leaderId = leaderId;
-    }
-
-    /**
      * Get the current term
      */
     public int getTerm() {
         return term;
-    }
-
-    /**
-     * Set the current term
-     */
-    public void setTerm(int term) {
-        this.term = term;
     }
 
     /**
@@ -68,24 +54,10 @@ public class AppendEntries {
     }
 
     /**
-     * Set the length of the logs' leader think - follower received
-     */
-    public void setPrefixLen(int prefixLen) {
-        this.prefixLen = prefixLen;
-    }
-
-    /**
      * Get the term of the log leader think - follower received
      */
     public int getPrefixTerm() {
         return prefixTerm;
-    }
-
-    /**
-     * Set the term of the log leader think - follower received
-     */
-    public void setPrefixTerm(int prefixTerm) {
-        this.prefixTerm = prefixTerm;
     }
 
     /**
@@ -96,17 +68,10 @@ public class AppendEntries {
     }
 
     /**
-     * Set the length of the logs' being committed by the leader
-     */
-    public void setCommitLength(int commitLength) {
-        this.commitLength = commitLength;
-    }
-
-    /**
      * Get the log at the given index
      */
-    public byte[] getSuffix(int index) {
-        byte[] data = null;
+    public Entry getSuffix(int index) {
+        Entry data = null;
 
         if (index < suffix.size()) {
             data = suffix.get(index);

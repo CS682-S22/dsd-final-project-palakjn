@@ -37,7 +37,7 @@ public class Broadcast {
                     if (CacheManager.addEntry(data, connection.getDestination().toString(), seqNum)) {
                         //Updating acknowledgement of the packets received by current leader
                         CacheManager.setAckedLength(CacheManager.getLocal().getId(), CacheManager.getLogLength());
-                        logger.info(String.format("[%s] Server added client %s log starting at offset %d.", CacheManager.getLocal().toString(), connection.getDestination().toString(), seqNum));
+                        logger.info(String.format("[%s] Server added client %s log with seqNum %d.", CacheManager.getLocal().toString(), connection.getDestination().toString(), seqNum));
                     } else {
                         logger.warn(String.format("[%s] Not able to write log with the offset %d from the client %s.", CacheManager.getLocal().toString(), seqNum, connection.getDestination().toString()));
                         nodeService.sendNACK(connection, Constants.REQUESTER.SERVER, seqNum, connection.getDestination());
@@ -52,7 +52,7 @@ public class Broadcast {
 
                     if (leader != null) {
                         logger.info(String.format("[%s] [Follower] Received the log from client %s. Sending leader %s information to the client.", CacheManager.getLocal().toString(), connection.getDestination().toString(), leader.toString()));
-                        Packet<Host> response = new Packet<>(Constants.PACKET_TYPE.RESP.ordinal(), 0, Constants.RESPONSE_STATUS.REDIRECT.ordinal(), leader);
+                        Packet<Host> response = new Packet<>(Constants.PACKET_TYPE.RESP.ordinal(), Constants.RESPONSE_STATUS.REDIRECT.ordinal(), leader);
                         byte[] responseBytes = PacketHandler.createPacket(Constants.REQUESTER.SERVER, Constants.HEADER_TYPE.RESP, response, seqNum, connection.getDestination());
                         connection.getDestination().send(responseBytes);
                     } else {
