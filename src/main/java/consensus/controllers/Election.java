@@ -160,6 +160,7 @@ public class Election {
 
             int randomPeriod = (int)Math.floor(Math.random()*(Constants.ELECTION_MAX_TIME-Constants.ELECTION_MIN_TIME+1)+Constants.ELECTION_MIN_TIME);
             electionTimer.schedule(timerTask, randomPeriod);
+            logger.info(String.format("[%s] Started election timer with period %d.", CacheManager.getLocal().toString(), randomPeriod));
         }
     }
 

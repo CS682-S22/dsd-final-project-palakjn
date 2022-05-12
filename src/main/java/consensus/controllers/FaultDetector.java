@@ -47,6 +47,7 @@ public class FaultDetector {
 
             int randomPeriod = (int) Math.floor(Math.random() * (Constants.FAULT_DETECTOR_MAX_VALUE - Constants.FAULT_DETECTOR_MIN_VALUE + 1) + Constants.FAULT_DETECTOR_MIN_VALUE);
             timer.schedule(task, randomPeriod);
+            logger.info(String.format("[%s] Started fault tolerant timer with period %d.", CacheManager.getLocal().toString(), randomPeriod));
         }
     }
 
