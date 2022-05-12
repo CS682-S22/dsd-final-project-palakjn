@@ -53,5 +53,6 @@ public class NodeService {
     public void sendACK(Connection connection, Constants.REQUESTER requester, int seqNum) {
         byte[] acknowledgement = PacketHandler.createACK(requester, seqNum, connection.getDestination());
         connection.getDestination().send(acknowledgement);
+        logger.debug(String.format("[%s] Send ACK to the host %s.", CacheManager.getLocal().toString(), connection.getDestination().toString()));
     }
 }

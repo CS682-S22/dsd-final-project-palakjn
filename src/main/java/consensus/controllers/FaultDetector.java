@@ -55,6 +55,7 @@ public class FaultDetector {
      * Stop the timer
      */
     public synchronized static void stopTimer() {
+        ThreadContext.put("module",CacheManager.getLocal().getName());
         logger.info(String.format("[%s] Stopping the fault detector.", CacheManager.getLocal().toString()));
         isRunning = false;
         timer.cancel();

@@ -124,14 +124,18 @@ public class Client {
             return;
         }
 
-        try {
-            Socket socket = serverSocket.accept();
-            Connection connection = new Connection(socket, socket.getInetAddress().getHostAddress(), socket.getPort());
-            if (connection.openConnection()) {
-                threadPool.execute(() -> producer.listenForResponse(connection));
+        while (running) {
+            try {
+                ThreadContext.put("module", config.getLocal().getName());
+                Socket socket = serverSocket.accept();
+                logger.debug(String.format("[%s] Received the connection from server.", config.getLocal().toString()));
+                Connection connection = new Connection(socket, socket.getInetAddress().getHostAddress(), socket.getPort());
+                if (connection.openConnection()) {
+                    threadPool.execute(() -> producer.listenForResponse(connection));
+                }
+            } catch (IOException exception) {
+                logger.error(String.format("[%s:%d] Fail to accept the connection from another host. ", config.getLocal().getAddress(), config.getLocal().getPort()), exception);
             }
-        } catch (IOException exception) {
-            logger.error(String.format("[%s:%d] Fail to accept the connection from another host. ", config.getLocal().getAddress(), config.getLocal().getPort()), exception);
         }
     }
 }

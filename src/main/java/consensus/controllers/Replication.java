@@ -105,7 +105,7 @@ public class Replication {
         } else {
             logger.warn(String.format("[%s] Rejecting the logs from the leader %s. CurrentTerm: %d, LeaderTerm: %d, log.length: %d," +
                     "prefixLen: %d, logs[prefixLen].term: %d, prefixTerm: %d", CacheManager.getLocal().toString(), leader.toString(), currentTerm, appendEntriesRequest.getTerm(),
-                    CacheManager.getLogLength(), appendEntriesRequest.getPrefixLen(), CacheManager.getEntry(appendEntriesRequest.getPrefixLen() - 1).getTerm(), appendEntriesRequest.getPrefixTerm()));
+                    CacheManager.getLogLength(), appendEntriesRequest.getPrefixLen(), appendEntriesRequest.getPrefixLen() == 0 ? -1 : CacheManager.getEntry(appendEntriesRequest.getPrefixLen() - 1).getTerm(), appendEntriesRequest.getPrefixTerm()));
         }
 
         AppendEntriesResponse response = new AppendEntriesResponse(currentTerm, ack, CacheManager.getLocal().getId(), isSuccess);

@@ -1,7 +1,9 @@
 package application.controllers;
 
 import application.configuration.Config;
+import com.google.gson.reflect.TypeToken;
 import configuration.Constants;
+import consensus.models.AppendEntriesRequest;
 import controllers.Connection;
 import models.Header;
 import models.Host;
@@ -97,13 +99,13 @@ public class Producer {
                             byte[] body = PacketHandler.getData(response);
 
                             if (body != null) {
-                                Packet<?> packet = JSONDeserializer.fromJson(body, Packet.class);
+                                Packet<Host> packet = JSONDeserializer.deserializePacket(body, new TypeToken<Packet<Host>>(){}.getType());
 
                                 if (packet != null) {
                                     if (packet.getStatus() == Constants.RESPONSE_STATUS.REDIRECT.ordinal()) {
-                                        if (packet.getObject() != null && packet.getObject() instanceof Host leader) {
-                                            logger.info(String.format("[%s] Leader changed. Sending data to the server %s with the sequence number %d.", config.getLocal().toString(), leader.toString(), offset));
-                                            config.setLeader(leader);
+                                        if (packet.getObject() != null ) {
+                                            logger.info(String.format("[%s] Leader changed. Sending data to the server %s with the sequence number %d.", config.getLocal().toString(), packet.getObject().toString(), offset));
+                                            config.setLeader(packet.getObject());
                                         } else {
                                             logger.warn(String.format("[%s] Leader changed but not found the leader info in the packet. Re-sending the same packet to the server %s with the seqNum as %d.", config.getLocal().toString(), config.getLeader().toString(), offset));
                                         }
