@@ -1,3 +1,4 @@
+import consensus.controllers.FaultDetector;
 import consensus.controllers.Replication;
 import controllers.Connection;
 import models.Host;
@@ -55,12 +56,6 @@ public class Server {
                 server.setNodeStatus();
                 server.setNodeWithOldOffsets();
                 CacheManager.initSentAndAckLength();
-
-                //TODO: Remove this as this is for testing
-                if (config.getLocal().getName().equals("Server1")) {
-                    CacheManager.setCurrentRole(Constants.ROLE.LEADER.ordinal());
-                    Replication.startTimer();
-                }
 
                 //Joining to the network
                 logger.info(String.format("[%s] Listening on port %d.", config.getLocal().getAddress(), config.getLocal().getPort()));
@@ -149,6 +144,7 @@ public class Server {
         }
 
         CacheManager.setCurrentRole(Constants.ROLE.FOLLOWER.ordinal());
+        FaultDetector.startTimer();
     }
 
     /**

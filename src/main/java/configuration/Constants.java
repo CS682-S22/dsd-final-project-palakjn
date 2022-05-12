@@ -17,6 +17,7 @@ public class Constants {
     public static int ELECTION_MAX_TIME = 2000;
     public static int FAULT_DETECTOR_MIN_VALUE = 1000;
     public static int FAULT_DETECTOR_MAX_VALUE = 2000;
+    public static int HEARTBEAT_TIMEOUT_THRESHOLD = 1500;
 
     public enum ROLE {
         LEADER,

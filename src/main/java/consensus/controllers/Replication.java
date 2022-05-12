@@ -82,13 +82,13 @@ public class Replication {
             CacheManager.setTerm(appendEntriesRequest.getTerm());
             CacheManager.setVoteFor(-1);
             Election.stopTimer();
-            //TODO: Start failure detection timer
+            FaultDetector.startTimer();
         }
 
         if (appendEntriesRequest.getTerm() == currentTerm) {
             CacheManager.setCurrentRole(Constants.ROLE.FOLLOWER.ordinal());
             CacheManager.setCurrentLeader(appendEntriesRequest.getLeaderId());
-            //TODO: Add timestamp when received the packet
+            FaultDetector.heartBeatReceived();
         }
 
         boolean logOk = CacheManager.getLogLength() >= appendEntriesRequest.getPrefixLen() &&
@@ -139,7 +139,7 @@ public class Replication {
             CacheManager.setCurrentRole(Constants.ROLE.FOLLOWER.ordinal());
             CacheManager.setVoteFor(-1);
             Election.stopTimer();
-            //TODO: Start failure detection timer
+            FaultDetector.startTimer();
         }
     }
 

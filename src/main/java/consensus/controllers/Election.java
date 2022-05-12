@@ -7,6 +7,7 @@ import models.Host;
 import models.Packet;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.apache.logging.log4j.ThreadContext;
 import utils.PacketHandler;
 
 import java.util.ArrayList;
@@ -29,7 +30,7 @@ public class Election {
      * Start the election when detected that leader is failed.
      */
     public static void startElection() {
-        //TODO: Stop Fault detector
+        FaultDetector.stopTimer();
 
         if (CacheManager.getCurrentRole() != Constants.ROLE.CANDIDATE.ordinal()) {
             logger.info(String.format("[%s] Starting election process.", CacheManager.getLocal().toString()));
@@ -72,7 +73,7 @@ public class Election {
             CacheManager.setCurrentRole(Constants.ROLE.FOLLOWER.ordinal());
             CacheManager.setVoteFor(-1);
 
-            //TODO: Start fault detector if not running before
+            FaultDetector.startTimer();
         }
 
         int lastTerm = CacheManager.getLastTerm();
@@ -113,6 +114,7 @@ public class Election {
                 CacheManager.setCurrentRole(Constants.ROLE.LEADER.ordinal());
                 CacheManager.setCurrentLeader(CacheManager.getLocal().getId());
                 stopTimer();
+                FaultDetector.stopTimer();
 
                 List<Host> followers = CacheManager.getNeighbors();
                 for (Host follower : followers) {
@@ -127,7 +129,7 @@ public class Election {
             stopTimer();
             CacheManager.setTerm(voteResponse.getTerm());
             CacheManager.setCurrentRole(Constants.ROLE.FOLLOWER.ordinal());
-            //TODO: Start fault detector if haven't started before
+            FaultDetector.startTimer();
             CacheManager.setVoteFor(-1);
         }
     }
@@ -143,6 +145,7 @@ public class Election {
             TimerTask timerTask = new TimerTask() {
                 @Override
                 public void run() {
+                    ThreadContext.put("module", CacheManager.getLocal().getName());
                     this.cancel();
                     stopTimer();
 
