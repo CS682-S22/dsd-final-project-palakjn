@@ -14,8 +14,8 @@ import java.lang.reflect.Type;
  *
  * @author Palak Jain
  */
-public class JSONDesrializer {
-    private static final Logger logger = LogManager.getLogger(JSONDesrializer.class);
+public class JSONDeserializer {
+    private static final Logger logger = LogManager.getLogger(JSONDeserializer.class);
 
     /**
      * Parse JSON string into an object

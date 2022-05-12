@@ -125,23 +125,28 @@ public class CacheManager {
     /**
      * Set the current term with the given value
      */
-    public static void setTerm(int term) {
+    public static int setTerm(int term) {
         statusLock.writeLock().lock();
 
         nodeState.setTerm(term);
 
-        statusLock.writeLock().unlock();
+        try {
+            return nodeState.getTerm();
+        } finally {
+            statusLock.writeLock().unlock();
+        }
     }
 
     /**
      * Increment the current term by one
      */
-    public static void incrementTerm() {
+    public static int incrementTerm() {
         statusLock.writeLock().lock();
 
         nodeState.incrementTerm();
 
         statusLock.writeLock().unlock();
+        return nodeState.getTerm();
     }
 
     /**
@@ -173,10 +178,20 @@ public class CacheManager {
     /**
      * Set the candidate id for whom the follower given the vote for the given term
      */
-    public static void setVoteFor(int nodeId) {
+    public static boolean setVoteFor(int nodeId) {
         statusLock.writeLock().lock();
-        nodeState.setVoteFor(nodeId);
+
+        boolean isVoted = false;
+
+        if (nodeId == -1) {
+            nodeState.setVoteFor(-1);
+        } else if (nodeState.getVotedFor() == -1 || nodeState.getVotedFor() == nodeId) {
+            nodeState.setVoteFor(nodeId);
+            isVoted = true;
+        }
+
         statusLock.writeLock().unlock();
+        return isVoted;
     }
 
     /**
@@ -450,6 +465,21 @@ public class CacheManager {
 
         dataLock.readLock().unlock();
         return entry;
+    }
+
+    /**
+     * Getting the last log term
+     */
+    public static int getLastTerm() {
+        dataLock.readLock().lock();
+        int term = 0;
+
+        if (entries.size() > 0) {
+            term = entries.get(entries.size() - 1).getTerm();
+        }
+
+        dataLock.readLock().unlock();
+        return term;
     }
 
     /**

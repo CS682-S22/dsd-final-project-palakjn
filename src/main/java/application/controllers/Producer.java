@@ -2,7 +2,6 @@ package application.controllers;
 
 import application.configuration.Config;
 import configuration.Constants;
-import consensus.controllers.CacheManager;
 import controllers.Connection;
 import models.Header;
 import models.Host;
@@ -10,7 +9,7 @@ import models.Packet;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.ThreadContext;
-import utils.JSONDesrializer;
+import utils.JSONDeserializer;
 import utils.PacketHandler;
 import utils.Strings;
 
@@ -98,7 +97,7 @@ public class Producer {
                             byte[] body = PacketHandler.getData(response);
 
                             if (body != null) {
-                                Packet<?> packet = JSONDesrializer.fromJson(body, Packet.class);
+                                Packet<?> packet = JSONDeserializer.fromJson(body, Packet.class);
 
                                 if (packet != null) {
                                     if (packet.getStatus() == Constants.RESPONSE_STATUS.REDIRECT.ordinal()) {

@@ -14,7 +14,7 @@ import consensus.controllers.database.StateDB;
 import consensus.models.Entry;
 import consensus.models.NodeState;
 import utils.FileManager;
-import utils.JSONDesrializer;
+import utils.JSONDeserializer;
 import utils.Strings;
 
 import java.io.BufferedReader;
@@ -97,7 +97,7 @@ public class Server {
         Config config = null;
 
         try (BufferedReader reader = Files.newBufferedReader(Paths.get(location))){
-            config = JSONDesrializer.fromJson(reader, Config.class);
+            config = JSONDeserializer.fromJson(reader, Config.class);
         }
         catch (IOException ioException) {
             System.out.printf("Unable to open configuration file at location %s. %s. \n", location, ioException.getMessage());

@@ -7,7 +7,7 @@ import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.ThreadContext;
 import consensus.controllers.CacheManager;
 import utils.FileManager;
-import utils.JSONDesrializer;
+import utils.JSONDeserializer;
 import utils.Strings;
 
 import java.io.BufferedReader;
@@ -85,7 +85,7 @@ public class Client {
         Config config = null;
 
         try (BufferedReader reader = Files.newBufferedReader(Paths.get(location))){
-            config = JSONDesrializer.fromJson(reader, Config.class);
+            config = JSONDeserializer.fromJson(reader, Config.class);
         }
         catch (IOException ioException) {
             System.out.printf("Unable to open configuration file at location %s. %s. \n", location, ioException.getMessage());

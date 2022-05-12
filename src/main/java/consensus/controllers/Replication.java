@@ -81,12 +81,14 @@ public class Replication {
             logger.info(String.format("[%s] Received AppendEntries from new leader %s with the new term %d. Old term: %d", CacheManager.getLocal().toString(), leader.toString(), appendEntriesRequest.getTerm(), currentTerm));
             CacheManager.setTerm(appendEntriesRequest.getTerm());
             CacheManager.setVoteFor(-1);
-            //TODO: Cancel election timer
+            Election.stopTimer();
+            //TODO: Start failure detection timer
         }
 
         if (appendEntriesRequest.getTerm() == currentTerm) {
             CacheManager.setCurrentRole(Constants.ROLE.FOLLOWER.ordinal());
             CacheManager.setCurrentLeader(appendEntriesRequest.getLeaderId());
+            //TODO: Add timestamp when received the packet
         }
 
         boolean logOk = CacheManager.getLogLength() >= appendEntriesRequest.getPrefixLen() &&
@@ -136,7 +138,7 @@ public class Replication {
             CacheManager.setTerm(appendEntriesResponse.getTerm());
             CacheManager.setCurrentRole(Constants.ROLE.FOLLOWER.ordinal());
             CacheManager.setVoteFor(-1);
-            //TODO: Cancel Election timer
+            Election.stopTimer();
             //TODO: Start failure detection timer
         }
     }
