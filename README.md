@@ -1,4 +1,4 @@
-# Implementing Distributed Banking System by using Raft Consensus Algorithm
+# Implementing Distributed publisher subscriber System by using Raft Consensus Algorithm
 ***
 
 > **Note:** The application has been taken only for learning how Raft Consensus Algorithm works, it may not exactly mimic the real distributed banking system.
@@ -6,12 +6,9 @@
 ### Description
 
 * Building leader based distributed system comprising n static nodes.
-* There can be more than one client.
-* The clients can have multiple accounts.
-* These accounts will be distributed among multiple servers in a cluster.
-* Clients can issue transactions only to the leader of the system.
-* The mode of transfer of these transactions is by log.
-* Each log contains the single command to execute by the system. The system accepts only those logs which have the command written in acceptable format only. 
+* There can be more than one Producer and consumer.
+* Producers will be publishing logs to the leader of the distributed system
+* Consumer will be pulling logs from the leader of the distributed system
 * Below is the architecture of the system:
 
 &nbsp;
@@ -26,10 +23,12 @@
 &nbsp;
 &nbsp;
 
-* Whenever a client will issue a log to a leader, it will go to the consensus module first which will ensure that the log should be written first to its local storage and then to the quorum of the nodes in the system.
+* Broker comprises two modules - Consensus module and state machine
+* Whenever producer will issue a log to a leader, it will first go to the consensus module which will ensure that the log should be written first to its local storage and then to the quorum of the nodes in the system.
 * Once the log is being committed in the majority of the nodes then only the log will be sent to the state machine.
-* The state machine will parse the received log to get the command to execute. 
-* The state machine will validate the command whether the command is valid or not. If it is valid, it will execute the command and will acknowledge the client. If it is not valid then, it will send negative acknowledgment to the client.
+* State machine will write the log to the log location which contains all the committed logs and will acknowledge back to the producer.
+* Consumer will periodically pull logs from the broker with the batch size of 10.
+* Consumer can ask the broker to send logs from specific offset
 
 ***
 
@@ -38,8 +37,8 @@
 **1) Initial Phase**
 
 * Starting with fixed configuration for a cluster.
-* The system will have n nodes (pre-configured) and each node will know about other n-1 nodes.
-* Initially, each node will join the network as follower. Leader will be chosen after election. 
+* The broker will have n nodes (pre-configured) and each node will know about other n-1 nodes.
+* Initially, each broker will join the network as follower. Leader will be chosen after election. 
 
 **2) System Model**
 
@@ -48,7 +47,7 @@
 
 **3) Strong Consistency**
 
-* All the state machines will execute same set of commands in the exact same order as being issued by the client.
+* Consumer will get the logs in the same order as the system received it from the producer.
 
 **4) Fault Tolerance**
 
@@ -60,39 +59,10 @@
 * Detecting the failure of leader by using Raft mechanism where follower will deduct the failure of the leader if it hasn't received the heartbeat message (AppendEntries) from the leader withing the certain amount of time.
 * Choosing leader by collecting the majority of votes from other nodes.
 
-***
+**6) No Duplicates**
 
-### Types of commands as log line
+* System will ensure not to append same log as received before from the producer
 
-**1) OPEN ACCOUNT <name>**
-
-* Example: OPEN ACCOUNT Palak
-* Will open the new account if not exist
-* If the account with the same name already exists then will send negative acknowledgement. 
-
-**2) CREDIT \<amount> \<name>**
-
-* Example: CREDIT 100 Palak
-* Adding the non-zero amount to the account with the given name if existed.
-* Will send NACK if account with the given name not exist or the amount < 1.
-
-**3) DEPOSIT \<amount> \<name>**
-
-* Example: DEPOSIT 100 Palak
-* If account exists with the given name and the available balance is more than the given amount then subtract the given amount from the available amount.
-* Else, send NACK to the client.
-
-**4) SHOW BALANCE <name>**
-
-* Example: SHOW BALANCE Palak
-* If the account exist with the given name then send the available balance.
-* Else, send NACK to the client.
-
-**5) CLOSE \<name>**
-
-* Example: CLOSE Palak
-* If the account exist with the given name then remove the account reference.
-* Else, send NACK to the client
 
 ***
 
@@ -108,11 +78,6 @@
 * Protobuf
 * GSON
 * log4j
-* MySQL (Still deciding on this one. Maybe I will store the necessary attributes in SQL)
+* MySQL 
 
-***
-
-### Optional Feature
-
-If time permits, I will implement Joint Consensus to support configuration changes where I can crash stop few nodes or add new nodes.
 
