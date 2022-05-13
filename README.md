@@ -1,8 +1,6 @@
 # Implementing Distributed publisher subscriber System by using Raft Consensus Algorithm
 ***
 
-> **Note:** The application has been taken only for learning how Raft Consensus Algorithm works, it may not exactly mimic the real distributed banking system.
-
 ### Description
 
 * Building leader based distributed system comprising n static nodes.
