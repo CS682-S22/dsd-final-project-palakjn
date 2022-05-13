@@ -22,14 +22,17 @@ public class Entry {
     @Expose
     private int receivedOffset;
     @Expose
+    private boolean isCommitted;
+    @Expose
     private byte[] data;
 
-    public Entry(int term, int fromOffset, int toOffset, String clientId, int receivedOffset) {
+    public Entry(int term, int fromOffset, int toOffset, String clientId, int receivedOffset, boolean isCommitted) {
         this.term = term;
         this.fromOffset = fromOffset;
         this.toOffset = toOffset;
         this.clientId = clientId;
         this.receivedOffset = receivedOffset;
+        this.isCommitted = isCommitted;
     }
 
     public Entry(Entry entry) {
@@ -39,6 +42,7 @@ public class Entry {
         this.clientId = entry.getClientId();
         this.receivedOffset = entry.getReceivedOffset();
         this.data = entry.getData();
+        this.isCommitted = entry.isCommitted();
     }
 
     /**
@@ -109,6 +113,20 @@ public class Entry {
      */
     public void setReceivedOffset(int receivedOffset) {
         this.receivedOffset = receivedOffset;
+    }
+
+    /**
+     * Get whether the entry is being committed
+     */
+    public boolean isCommitted() {
+        return isCommitted;
+    }
+
+    /**
+     * Set isCommitted to true
+     */
+    public void setCommitted() {
+        isCommitted = true;
     }
 
     /**

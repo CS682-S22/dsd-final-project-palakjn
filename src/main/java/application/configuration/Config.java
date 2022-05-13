@@ -16,6 +16,14 @@ public class Config {
     private Host leader;
     @Expose
     private String location;
+    @Expose
+    private boolean isProducer;
+    @Expose
+    private boolean isConsumer;
+    @Expose
+    private int offset;
+    @Expose
+    private int numOfLogs;
 
     /**
      * Get the details of local client
@@ -46,11 +54,49 @@ public class Config {
     }
 
     /**
+     * Gets whether the host is producer
+     */
+    public boolean isProducer() {
+        return isProducer;
+    }
+
+    /**
+     * Gets whether the host is consumer
+     */
+    public boolean isConsumer() {
+        return isConsumer;
+    }
+
+    /**
+     * Get the starting offset
+     */
+    public int getOffset() {
+        return offset;
+    }
+
+    /**
+     * Set the starting offset
+     */
+    public void setOffset(int offset) {
+        this.offset = offset;
+    }
+
+    /**
+     * Get number of logs to read in single call
+     */
+    public int getNumOfLogs() {
+        return numOfLogs;
+    }
+
+    /**
      * Checks whether the values given by client is valid or not
      */
     public boolean isValid() {
         return  local != null && local.isValid() &&
                 leader != null && leader.isValid() &&
-                !Strings.isNullOrEmpty(location);
+                !Strings.isNullOrEmpty(location) &&
+                !(isConsumer && isProducer) &&
+                !(!isConsumer && !isProducer) &&
+                (!isConsumer || (offset >= 0 && numOfLogs > 0));
     }
 }

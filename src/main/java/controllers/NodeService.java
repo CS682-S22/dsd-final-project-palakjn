@@ -2,6 +2,7 @@ package controllers;
 
 import configuration.Constants;
 import models.Host;
+import models.Packet;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import consensus.controllers.CacheManager;
@@ -40,19 +41,51 @@ public class NodeService {
     }
 
     /**
+     * Send REDIRECT packet to the producer/consumer as the current server is not leader
+     */
+    public void sendLeaderInfo(Host client, int seqNum) {
+        Host leader = null;
+        int leaderId = CacheManager.getCurrentLeader();
+
+        if (leaderId != -1) {
+            leader = CacheManager.getNeighbor(leaderId);
+        }
+
+        if (leader != null) {
+            logger.info(String.format("[%s] [Follower] Received the request from consumer/producer %s. Sending leader %s information to the consumer/producer.", CacheManager.getLocal().toString(), client.toString(), leader.toString()));
+            Packet<Host> response = new Packet<>(Constants.RESPONSE_STATUS.REDIRECT.ordinal(), leader);
+            byte[] responseBytes = PacketHandler.createPacket(Constants.REQUESTER.SERVER, Constants.HEADER_TYPE.RESP, response, seqNum, client);
+            client.send(responseBytes);
+        } else {
+            logger.warn(String.format("[%s] Leader information not found. Sending NACK to the consumer/producer %s.", CacheManager.getLocal().toString(), client.toString()));
+            sendNACK(client, Constants.REQUESTER.SERVER, seqNum);
+        }
+    }
+
+    /**
+     * Send ELECTION packet to the producer/consumer as the election process going on
+     */
+    public void sendWaitToClient(Host client, int seqNum) {
+        logger.warn(String.format("[%s] Server found the crash of the leader. In ELECTION mode. Sending ELECTION to the consumer %s.", CacheManager.getLocal().toString(), client.toString()));
+        Packet<?> response = new Packet<>(Constants.RESPONSE_STATUS.ELECTION.ordinal());
+        byte[] responseBytes = PacketHandler.createPacket(Constants.REQUESTER.SERVER, Constants.HEADER_TYPE.RESP, response, seqNum, client);
+        client.send(responseBytes);
+    }
+
+    /**
      * Send negative acknowledgment response to the host
      */
-    public void sendNACK(Connection connection, Constants.REQUESTER requester, int seqNum) {
-        byte[] acknowledgement = PacketHandler.createNACK(requester, seqNum, connection.getDestination());
-        connection.getDestination().send(acknowledgement);
+    public void sendNACK(Host host, Constants.REQUESTER requester, int seqNum) {
+        byte[] acknowledgement = PacketHandler.createNACK(requester, seqNum, host);
+        host.send(acknowledgement);
     }
 
     /**
      * Send acknowledgment response to the host
      */
-    public void sendACK(Connection connection, Constants.REQUESTER requester, int seqNum) {
-        byte[] acknowledgement = PacketHandler.createACK(requester, seqNum, connection.getDestination());
-        connection.getDestination().send(acknowledgement);
-        logger.debug(String.format("[%s] Send ACK to the host %s.", CacheManager.getLocal().toString(), connection.getDestination().toString()));
+    public void sendACK(Host host, Constants.REQUESTER requester, int seqNum) {
+        byte[] acknowledgement = PacketHandler.createACK(requester, seqNum, host);
+        host.send(acknowledgement);
+        logger.debug(String.format("[%s] Send ACK to the host %s.", CacheManager.getLocal().toString(), host.toString()));
     }
 }

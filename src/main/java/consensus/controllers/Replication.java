@@ -9,6 +9,7 @@ import models.Packet;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.ThreadContext;
+import stateMachine.Broker;
 import utils.FileManager;
 import utils.PacketHandler;
 
@@ -126,7 +127,7 @@ public class Replication {
                 logger.info(String.format("[%s] Received an acknowledgement from the follower %s that it has received the total of %d logs till now.", CacheManager.getLocal().toString(), follower.getId(), appendEntriesResponse.getAck()));
                 CacheManager.setSentLength(follower.getId(), appendEntriesResponse.getAck());
                 CacheManager.setAckedLength(follower.getId(), appendEntriesResponse.getAck());
-                //TODO: commitLogEntries()
+                commitLogEntries();
             } else if (CacheManager.getSentLength(appendEntriesResponse.getNodeId()) > 0) {
                 logger.info(String.format("[%s] Need to repair the logs with the follower %s as follower is behind the prefix logs. " +
                         "Previously sent logs from %d position. Now, sending from %d position.", CacheManager.getLocal().toString(), follower.toString(), CacheManager.getSentLength(currentTerm), CacheManager.getSentLength(currentTerm) - 1));
@@ -183,25 +184,78 @@ public class Replication {
 
         int commitLength = CacheManager.getCommitLength();
         if (appendEntriesRequest.getCommitLength() > commitLength) {
-            for (index = commitLength - 1; index < appendEntriesRequest.getCommitLength(); index++) {
-                //TODO: Deliver log[i] message to the application
+            logger.info(String.format("[%s] Leader has committed few entries. CommitLength: %d.  Leader's commit length: %d. Sending logs to Broker",
+                    CacheManager.getLocal().toString(), commitLength, appendEntriesRequest.getCommitLength()));
+            while (commitLength < appendEntriesRequest.getCommitLength()) {
+                if (sendToBroker(commitLength)) {
+                    commitLength++;
+                } else {
+                    break;
+                }
+            }
+        }
+    }
+
+    /**
+     * Commit log entries after receiving acknowledgements from the majority of the nodes
+     */
+    private void commitLogEntries() {
+        int logLength = CacheManager.getLogLength();
+        int commitLength = CacheManager.getCommitLength();
+        List<Host> nodes = CacheManager.getNeighbors();
+
+        logger.info(String.format("[%s] [Leader] %s logs as commitLength: %d and logLength: %d.", CacheManager.getLocal().toString(),
+                commitLength < logLength ? "Will try to commit" : "Will not commit", commitLength, logLength));
+
+        while (commitLength < logLength) {
+            int ack = 0;
+
+            for (Host node : nodes) {
+                if (CacheManager.getAckedLength(node.getId()) > commitLength) {
+                    ack = ack + 1;
+                }
             }
 
-            //TODO: Set only those which are successfully applied to state machine
-            CacheManager.setCommitLength(appendEntriesRequest.getCommitLength());;
+            if (ack >= Math.ceil((CacheManager.getMemberCount() + 1) / 2.0)) {
+                if (sendToBroker(commitLength)) {
+                    commitLength++;
+                } else {
+                    break;
+                }
+            } else {
+                break;
+            }
         }
+    }
+
+    /**
+     * Sending log to the broker after being replicated to the majority of nodes
+     */
+    private static boolean sendToBroker(int commitLength) {
+        logger.info(String.format("[%s] Committing log number %d.", CacheManager.getLocal().toString(), commitLength));
+        boolean isSuccess = false;
+
+        Entry entry = CacheManager.getEntry(commitLength);
+        byte[] data = FileManager.read(CacheManager.getLocation(), entry.getFromOffset(), (entry.getToOffset() + 1) - entry.getFromOffset());
+        if (data != null && Broker.publish(entry.getClientId(), data, entry.getReceivedOffset())) {
+            commitLength++;
+            CacheManager.setCommitLength(commitLength);
+            entry.setCommitted();
+            isSuccess = true;
+        }
+
+        return isSuccess;
     }
 
     /**
      * Replicate the logs which are not sent before to the follower
      */
     private static void replicate(int currentTerm, Host follower) {
-
         //Getting the length of the logs already being sent to the follower before
         int prefixLen = CacheManager.getSentLength(follower.getId());
 
         //Getting batch of 10 logs metadata from the prefixLen
-        List<Entry> entries = CacheManager.getEntries(prefixLen);
+        List<Entry> entries = CacheManager.getEntries(prefixLen, Constants.SUFFIX_BATCH_SIZE, false);
 
         int prefixTerm = 0;
 
@@ -212,7 +266,7 @@ public class Replication {
         List<Entry> suffix = new ArrayList<>();
 
         for (Entry entry : entries) {
-            byte[] data = FileManager.read(entry.getFromOffset(), (entry.getToOffset() + 1) - entry.getFromOffset());
+            byte[] data = FileManager.read(CacheManager.getLocation(), entry.getFromOffset(), (entry.getToOffset() + 1) - entry.getFromOffset());
 
             if (data != null) {
                 Entry copyEntry = new Entry(entry);

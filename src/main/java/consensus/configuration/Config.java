@@ -24,6 +24,8 @@ public class Config {
     private String password;
     @Expose
     private String location;
+    @Expose
+    private String commitLocation;
 
     /**
      * Get the detail of local running instance
@@ -80,11 +82,12 @@ public class Config {
         return location;
     }
 
+
     /**
-     * Set the file location
+     * Get the commit file location
      */
-    public void setLocation(String location) {
-        this.location = location;
+    public String getCommitLocation() {
+        return commitLocation;
     }
 
     /**
@@ -98,7 +101,8 @@ public class Config {
                           !Strings.isNullOrEmpty(password) &&
                           members != null &&
                           members.size() > 0 &&
-                          !Strings.isNullOrEmpty(location);
+                          !Strings.isNullOrEmpty(location) &&
+                          !Strings.isNullOrEmpty(commitLocation);
         if (members != null) {
             for (Host member : members) {
                 isValid = member.isValid() && isValid;

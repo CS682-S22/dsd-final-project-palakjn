@@ -13,7 +13,6 @@ import models.Host;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.ThreadContext;
-import utils.FileManager;
 import utils.JSONDeserializer;
 import utils.Strings;
 
@@ -49,10 +48,9 @@ public class Server {
                 CacheManager.setLocal(config.getLocal());
                 server.addMembers(config);
                 DataSource.init(config);
-                FileManager.init(config.getLocation());
 
                 //Getting data from disk to get the details of status of the nodes before crash
-                server.setNodeStatus();
+                server.setNodeStatus(config);
                 server.setNodeWithOldOffsets();
                 CacheManager.initSentAndAckLength();
 
@@ -135,12 +133,15 @@ public class Server {
     /**
      * Get the status of the node from disk and add it to the cache (To support Crash recovery)
      */
-    private void setNodeStatus() {
+    private void setNodeStatus(Config config) {
         NodeState nodeState = StateDB.get();
 
         if (nodeState != null) {
             CacheManager.setNodeState(nodeState);
         }
+
+        CacheManager.setCommitLocation(config.getCommitLocation());
+        CacheManager.setLocation(config.getLocation());
 
         CacheManager.setCurrentRole(Constants.ROLE.FOLLOWER.ordinal());
         FaultDetector.startTimer();

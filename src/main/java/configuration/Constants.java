@@ -10,7 +10,8 @@ public class Constants {
     public static final int END_VALID_PORT = 1724;
     public static int NUM_OF_THREADS = 50;
     public static int PRODUCER_WAIT_TIME = 30000;
-    public static int PRODUCER_SLEEP_TIME = 500;
+    public static int CONSUMER_WAIT_TIME = 500;
+    public static int CLIENT_SLEEP_TIME = 500;
     public static int SUFFIX_BATCH_SIZE = 10;
     public static int REPLICATION_PERIOD = 200;
     public static int ELECTION_MIN_TIME = 1000;
@@ -26,8 +27,9 @@ public class Constants {
     }
 
     public enum REQUESTER {
-        CLIENT,
-        SERVER
+        PRODUCER,
+        SERVER,
+        CONSUMER
     }
 
     public enum HEADER_TYPE {
@@ -39,7 +41,9 @@ public class Constants {
         VOTE_REQ,
         VOTE_RESP,
         ENTRY_REQ,
-        ENTRY_RESP
+        ENTRY_RESP,
+        PULL_REQ,
+        PULL_RESP
     }
 
     public enum RESPONSE_STATUS {

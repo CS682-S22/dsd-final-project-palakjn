@@ -41,6 +41,16 @@ public class Host {
         this.nodeService = new NodeService();
     }
 
+    public Host(String clientId) {
+        if (!Strings.isNullOrEmpty(clientId)) {
+            String[] parts = clientId.split(":");
+            if (parts.length == 2) {
+                address = parts[0];
+                port = Integer.parseInt(parts[1]);
+            }
+        }
+    }
+
     public Host() {
         this.nodeService = new NodeService();
     }

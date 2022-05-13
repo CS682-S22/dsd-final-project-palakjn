@@ -26,7 +26,7 @@ public class StateDB {
 
         if (state == null) {
             try (Connection con = DataSource.getConnection()) {
-                String query = "INSERT into state VALUES (?, ?, ?, ?, ?);";
+                String query = "INSERT into state VALUES (?, ?, ?, ?, ?, ?, ?);";
 
                 PreparedStatement statement = con.prepareStatement(query);
                 statement.setInt(1, CacheManager.getLocal().getId());
@@ -34,6 +34,8 @@ public class StateDB {
                 statement.setInt(3, nodeState.getVotedFor());
                 statement.setInt(4, nodeState.getCommitLength());
                 statement.setInt(5, nodeState.getCurrentLeader());
+                statement.setString(6, nodeState.getCommitLocation());
+                statement.setString(7, nodeState.getLocation());
 
                 statement.executeUpdate();
             } catch (SQLException sqlException) {
@@ -60,7 +62,9 @@ public class StateDB {
                 nodeState = new NodeState(resultSet.getInt("term"),
                                           resultSet.getInt("votedFor"),
                                           resultSet.getInt("commitLength"),
-                                          resultSet.getInt("leader"));
+                                          resultSet.getInt("leader"),
+                                          resultSet.getString("commitLocation"),
+                                          resultSet.getString("location"));
             }
         } catch (SQLException sqlException) {
             logger.error("Error while getting the state of the node", sqlException);
@@ -87,12 +91,5 @@ public class StateDB {
         } catch (SQLException sqlException) {
             logger.error("Error while updating the state of the node", sqlException);
         }
-    }
-
-    /**
-     * Setting the status values at the appropriate places in prepared statement
-     */
-    private static void execute(NodeState nodeState, Connection con, String query) throws SQLException {
-
     }
 }

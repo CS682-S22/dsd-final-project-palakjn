@@ -1,4 +1,6 @@
 import application.configuration.Config;
+import application.controllers.Client;
+import application.controllers.Consumer;
 import application.controllers.Producer;
 import configuration.Constants;
 import controllers.Connection;
@@ -6,7 +8,6 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.ThreadContext;
 import consensus.controllers.CacheManager;
-import utils.FileManager;
 import utils.JSONDeserializer;
 import utils.Strings;
 
@@ -24,39 +25,46 @@ import java.util.concurrent.Executors;
  *
  * @author Palak Jain
  */
-public class Client {
-    private static final Logger logger = LogManager.getLogger(Client.class);
-    private Producer producer;
+public class Application {
+    private static final Logger logger = LogManager.getLogger(Application.class);
+    private Client client;
     private ExecutorService threadPool;
     private boolean running;
 
-    public Client() {
+    public Application() {
         threadPool = Executors.newFixedThreadPool(Constants.NUM_OF_THREADS);
         running = true;
     }
 
     public static void main(String[] args) {
-        Client client = new Client();
-        String location = client.getConfigLocation(args);
+        Application application = new Application();
+        String location = application.getConfigLocation(args);
 
         if (!Strings.isNullOrEmpty(location)) {
-            Config config = client.getConfig(location);
+            Config config = application.getConfig(location);
 
-            if (client.isValid(config)) {
+            if (application.isValid(config)) {
                 ThreadContext.put("module", config.getLocal().getName());
                 CacheManager.setLocal(config.getLocal());
-                FileManager.init(config.getLocation());
-                client.producer = new Producer(config);
+                if (config.isProducer()) {
+                    application.client = new Producer(config);
+                } else if (config.isConsumer()) {
+                    application.client = new Consumer(config);
+                }
 
                 //Joining to the network
                 logger.info(String.format("[%s] Listening on port %d.", config.getLocal().getAddress(), config.getLocal().getPort()));
                 System.out.printf("[%s] Listening on port %d.\n", config.getLocal().getAddress(), config.getLocal().getPort());
 
                 //Starting thread to listen for the connections to get
-                Thread connectionThread = new Thread(() -> client.listen(config));
+                Thread connectionThread = new Thread(() -> application.listen(config));
                 connectionThread.start();
 
-                client.producer.send();
+                if (config.isProducer()) {
+                    application.client.send();
+                } else if (config.isConsumer()) {
+                    application.client.pull();
+                }
             }
         }
     }
@@ -131,7 +139,7 @@ public class Client {
                 logger.debug(String.format("[%s] Received the connection from server.", config.getLocal().toString()));
                 Connection connection = new Connection(socket, socket.getInetAddress().getHostAddress(), socket.getPort());
                 if (connection.openConnection()) {
-                    threadPool.execute(() -> producer.listenForResponse(connection));
+                    threadPool.execute(() -> client.listenForResponse(connection));
                 }
             } catch (IOException exception) {
                 logger.error(String.format("[%s:%d] Fail to accept the connection from another host. ", config.getLocal().getAddress(), config.getLocal().getPort()), exception);

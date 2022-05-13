@@ -25,7 +25,7 @@ public class EntryDB {
      */
     public static void insert(Entry entry) {
         try (Connection connection = DataSource.getConnection()) {
-            String query = "INSERT INTO entries VALUES (?, ?, ?, ?, ?, ?)";
+            String query = "INSERT INTO entries VALUES (?, ?, ?, ?, ?, ?, ?)";
 
             PreparedStatement statement = connection.prepareStatement(query);
             statement.setInt(1, entry.getTerm());
@@ -34,6 +34,7 @@ public class EntryDB {
             statement.setString(4, entry.getClientId());
             statement.setInt(5, entry.getReceivedOffset());
             statement.setInt(6, CacheManager.getLocal().getId());
+            statement.setBoolean(7, entry.isCommitted());
 
             statement.executeUpdate();
         } catch (SQLException sqlException) {
@@ -77,7 +78,8 @@ public class EntryDB {
                                     resultSet.getInt("fromOffset"),
                                     resultSet.getInt("toOffset"),
                                     resultSet.getString("clientId"),
-                                    resultSet.getInt("clientOffset"));
+                                    resultSet.getInt("clientOffset"),
+                                    resultSet.getBoolean("isCommitted"));
                 if (entries == null) { entries = new ArrayList<>(); }
                 entries.add(entry);
             }

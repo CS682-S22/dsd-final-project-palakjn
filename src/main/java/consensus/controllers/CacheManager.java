@@ -1,6 +1,7 @@
 package consensus.controllers;
 
 import configuration.Constants;
+import consensus.controllers.database.StateDB;
 import models.Host;
 import consensus.controllers.database.EntryDB;
 import consensus.models.Entry;
@@ -22,7 +23,6 @@ public class CacheManager {
     private static NodeState nodeState = new NodeState();
     private static List<Integer> sentLength = new ArrayList<>(); //Total number of the logs being sent to other nodes. Log index represents node id.
     private static List<Integer> ackedLength = new ArrayList<>(); // Total number of the logs received by the other nodes. Log index represents node id.
-    private static List<Integer>  lastLogTermReceived = new ArrayList<>(); //Term of the last log received by the other nodes. Log index represents node id.
     private static List<Entry> entries = new ArrayList<>(); //List of offsets of the received log from client/leader
 
     //Locks
@@ -105,7 +105,9 @@ public class CacheManager {
      */
     public static void setNodeState(NodeState nodeState) {
         statusLock.writeLock().lock();
-        CacheManager.nodeState = nodeState;
+        CacheManager.nodeState = new NodeState(nodeState);
+
+        StateDB.update(CacheManager.nodeState);
         statusLock.writeLock().unlock();
     }
 
@@ -131,10 +133,57 @@ public class CacheManager {
         nodeState.setTerm(term);
 
         try {
+            StateDB.update(CacheManager.nodeState);
             return nodeState.getTerm();
         } finally {
             statusLock.writeLock().unlock();
         }
+    }
+
+    /**
+     * Get the location of the file which contains commit logs
+     */
+    public static String getCommitLocation() {
+        statusLock.readLock().lock();
+
+        try {
+            return nodeState.getCommitLocation();
+        } finally {
+            statusLock.readLock().unlock();
+        }
+    }
+
+    /**
+     * Get the location of the file which contains logs written by consensus system
+     */
+    public static String getLocation() {
+        statusLock.readLock().lock();
+
+        try {
+            return nodeState.getLocation();
+        } finally {
+            statusLock.readLock().unlock();
+        }
+    }
+
+    /**
+     * Set the location of the file which contains commit logs
+     */
+    public static void setCommitLocation(String location) {
+        statusLock.writeLock().lock();
+        nodeState.setCommitLocation(location);
+        StateDB.update(CacheManager.nodeState);
+        statusLock.writeLock().unlock();
+    }
+
+    /**
+     * Set the location of the file which contains logs written by consensus system
+     */
+    public static void setLocation(String location) {
+        statusLock.writeLock().lock();
+        nodeState.setLocation(location);
+        StateDB.update(CacheManager.nodeState);
+        statusLock.writeLock().unlock();
     }
 
     /**
@@ -144,6 +193,7 @@ public class CacheManager {
         statusLock.writeLock().lock();
 
         nodeState.incrementTerm();
+        StateDB.update(CacheManager.nodeState);
 
         statusLock.writeLock().unlock();
         return nodeState.getTerm();
@@ -157,19 +207,6 @@ public class CacheManager {
 
         try {
             return nodeState.getVotedFor();
-        } finally {
-            statusLock.readLock().unlock();
-        }
-    }
-
-    /**
-     * Checking whether the follower voted for the given node id
-     */
-    public static boolean isAlreadyVotedFor(int nodeId) {
-        statusLock.readLock().lock();
-
-        try {
-            return nodeState.isAlreadyVotedFor(nodeId);
         } finally {
             statusLock.readLock().unlock();
         }
@@ -190,6 +227,7 @@ public class CacheManager {
             isVoted = true;
         }
 
+        StateDB.update(CacheManager.nodeState);
         statusLock.writeLock().unlock();
         return isVoted;
     }
@@ -236,6 +274,7 @@ public class CacheManager {
         statusLock.writeLock().lock();
 
         nodeState.setCurrentRole(currentRole);
+        StateDB.update(CacheManager.nodeState);
 
         statusLock.writeLock().unlock();
     }
@@ -260,6 +299,7 @@ public class CacheManager {
         statusLock.writeLock().lock();
 
         nodeState.setCurrentLeader(currentLeader);
+        StateDB.update(CacheManager.nodeState);
 
         statusLock.writeLock().unlock();
     }
@@ -362,44 +402,17 @@ public class CacheManager {
     }
 
     /**
-     * Get the term of the last message being written by the given nodeId
-     */
-    public static int getLastLogTermAck(int nodeId) {
-        dataLock.readLock().lock();
-
-        try {
-            return lastLogTermReceived.get(nodeId);
-        } finally {
-            dataLock.readLock().unlock();
-        }
-    }
-
-    /**
-     * Set the term of the last message being written by the given nodeId
-     */
-    public static void setLastLogTermAck(int nodeId, int term) {
-        dataLock.writeLock().lock();
-
-        lastLogTermReceived.set(nodeId, term);
-
-        dataLock.writeLock().unlock();
-    }
-
-    /**
      * Append log to the local file and add term, offset information as new entry to in-memory and db
      */
     public static boolean addEntry(byte[] log, String clientId, int clientOffset) {
         dataLock.writeLock().lock();
         //Writing log data to local file
-        int offset = 0;
-        if (entries.size() > 0) {
-            offset = entries.get(entries.size() - 1).getToOffset() + 1;
-        }
-        boolean isSuccess = FileManager.write(log, offset);
+        int offset = getLastOffset(false);
+        boolean isSuccess = FileManager.write(CacheManager.getLocation(), log, offset);
 
         if (isSuccess) {
             //Adding new entry to in-memory data structure
-            Entry entry = new Entry(getTerm(), offset, offset + log.length - 1, clientId, clientOffset);
+            Entry entry = new Entry(getTerm(), offset, offset + log.length - 1, clientId, clientOffset, false);
             entries.add(entry);
 
             //Adding new entry to SQL
@@ -408,6 +421,49 @@ public class CacheManager {
 
         dataLock.writeLock().unlock();
         return isSuccess;
+    }
+
+    /**
+     * Get the offset from where to write to the file
+     */
+    public static int getLastOffset(boolean commit) {
+        dataLock.readLock().lock();
+        int offset = 0;
+
+        if (entries.size() > 0) {
+            for (int index = entries.size() - 1; index >= 0; index--) {
+                if (!commit || entries.get(index).isCommitted()) {
+                    offset = entries.get(index).getToOffset() + 1;
+                    break;
+                }
+            }
+        }
+
+        dataLock.readLock().unlock();
+        return offset;
+    }
+
+    /**
+     * Get the index of the entry
+     */
+    public static int getEntryIndex(int fromOffset, boolean commitOnly) {
+        dataLock.readLock().lock();
+        int entryIndex = -1;
+
+        for (int index = 0; index < entries.size(); index++) {
+            Entry entry = entries.get(index);
+
+            if (entry.getFromOffset() == fromOffset) {
+                if (!commitOnly || entry.isCommitted()) {
+                    entryIndex = index;
+                }
+
+                break;
+            }
+        }
+
+        dataLock.readLock().unlock();
+        return entryIndex;
     }
 
     /**
@@ -433,16 +489,26 @@ public class CacheManager {
     }
 
     /**
-     * Get BATCH-SIZE number of entries from the given index
+     * If commitOnly is true then, send given number of entries from the given index only if they are committed
+     * If commitOnly is false then, send given number of entries from the given index
      */
-    public static List<Entry> getEntries(int startIndex) {
+    public static List<Entry> getEntries(int startIndex, int batchCount, boolean commitOnly) {
         dataLock.readLock().lock();
         List<Entry> entries = new ArrayList<>();
         int logLength = CacheManager.entries.size();
         int count = 0;
 
-        while (startIndex < logLength && count < Constants.SUFFIX_BATCH_SIZE) {
-            entries.add(CacheManager.entries.get(startIndex));
+        while (startIndex < logLength && count < batchCount) {
+            Entry entry = CacheManager.entries.get(startIndex);
+            if (commitOnly) {
+                if (entry.isCommitted()) {
+                    entries.add(new Entry(entry));
+                } else {
+                    break;
+                }
+            } else {
+                entries.add(new Entry(entry));
+            }
 
             startIndex++;
             count++;
@@ -487,6 +553,9 @@ public class CacheManager {
      */
     public static void removeEntryFrom(int index) {
         dataLock.writeLock().lock();
+
+        Entry entry = entries.get(index);
+
 
         int fromOffset = entries.get(index).getFromOffset();
         entries.subList(index, entries.size() - 1).clear();
