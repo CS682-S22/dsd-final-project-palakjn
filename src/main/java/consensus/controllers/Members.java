@@ -2,6 +2,7 @@ package consensus.controllers;
 
 import models.Host;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -68,6 +69,18 @@ public class Members {
      */
     public List<Host> getNeighbors() {
         return members.values().stream().toList();
+    }
+
+    /**
+     * Get all the members
+     */
+    public List<Host> getMembers() {
+        List<Host> members = new ArrayList<>();
+        members.add(local);
+        members.addAll(this.members.values());
+
+        return members;
+
     }
 
     /**

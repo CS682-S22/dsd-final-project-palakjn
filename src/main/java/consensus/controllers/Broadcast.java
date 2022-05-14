@@ -32,7 +32,7 @@ public class Broadcast {
             if (data != null) {
                 if (CacheManager.getCurrentRole() == Constants.ROLE.LEADER.ordinal()) {
                     //Appending the log to the local
-                    if (CacheManager.addEntry(data, connection.getDestination().toString(), seqNum)) {
+                    if (CacheManager.addEntry(data, CacheManager.getTerm(), connection.getDestination().toString(), seqNum)) {
                         //Updating acknowledgement of the packets received by current leader
                         CacheManager.setAckedLength(CacheManager.getLocal().getId(), CacheManager.getLogLength());
                         logger.info(String.format("[%s] Server added client %s log with seqNum %d.", CacheManager.getLocal().toString(), connection.getDestination().toString(), seqNum));
@@ -48,6 +48,7 @@ public class Broadcast {
             }
         } else {
             logger.warn(String.format("[%s] Server received duplicate DATA request from client %s to hold log at the starting offset %d. Server already holds the client logs till offset %d.", CacheManager.getLocal().toString(), connection.getDestination().toString(), seqNum, lastReceivedOffset));
+            nodeService.sendACK(connection.getDestination(), Constants.REQUESTER.SERVER, seqNum);
         }
     }
 }

@@ -1,6 +1,8 @@
 package consensus.controllers;
 
 import controllers.Connection;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -46,9 +48,7 @@ public class Channels {
      */
     public static void upsert(String key, Connection connection) {
         lock.writeLock().lock();
-
         connections.put(key, connection);
-
         lock.writeLock().unlock();
     }
 

@@ -4,6 +4,8 @@ import com.google.gson.annotations.Expose;
 import models.Host;
 import utils.Strings;
 
+import java.util.List;
+
 /**
  * Responsible for holding values responsible to start the client.
  *
@@ -13,11 +15,13 @@ public class Config {
     @Expose
     private Host local;
     @Expose
-    private Host leader;
+    private List<Host> members;
     @Expose
     private String location;
     @Expose
     private boolean isProducer;
+    @Expose
+    private boolean pressEnterToSend;
     @Expose
     private boolean isConsumer;
     @Expose
@@ -33,17 +37,17 @@ public class Config {
     }
 
     /**
-     * Get the details of leader
+     * Get the member at the given index
      */
-    public Host getLeader() {
-        return leader;
+    public Host getMember(int index) {
+        return members.get(index);
     }
 
     /**
-     * Set the new leader
+     * Get the number of members in the system
      */
-    public void setLeader(Host leader) {
-        this.leader = leader;
+    public int getMemberCount() {
+        return members.size();
     }
 
     /**
@@ -58,6 +62,13 @@ public class Config {
      */
     public boolean isProducer() {
         return isProducer;
+    }
+
+    /**
+     * Gets whether to press enter to send new log
+     */
+    public boolean isPressEnterToSend() {
+        return pressEnterToSend;
     }
 
     /**
@@ -92,11 +103,19 @@ public class Config {
      * Checks whether the values given by client is valid or not
      */
     public boolean isValid() {
-        return  local != null && local.isValid() &&
-                leader != null && leader.isValid() &&
-                !Strings.isNullOrEmpty(location) &&
-                !(isConsumer && isProducer) &&
-                !(!isConsumer && !isProducer) &&
-                (!isConsumer || (offset >= 0 && numOfLogs > 0));
+        boolean isValid =  local != null && local.isValid() &&
+                            members != null && members.size() > 0 &&
+                            !Strings.isNullOrEmpty(location) &&
+                            !(isConsumer && isProducer) &&
+                            !(!isConsumer && !isProducer) &&
+                            (!isConsumer || (offset >= 0 && numOfLogs > 0));
+
+        if (isValid) {
+            for (Host member : members) {
+                isValid = member.isValid() && isValid;
+            }
+        }
+
+        return isValid;
     }
 }

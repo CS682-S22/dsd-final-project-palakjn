@@ -29,13 +29,11 @@ public class RequestHandler {
     private Connection connection;
     private NodeService nodeService;
     private Broadcast broadcast;
-    private Replication replication;
 
     public RequestHandler(Connection connection) {
         this.connection = connection;
         nodeService = new NodeService();
         broadcast = new Broadcast();
-        replication = new Replication();
     }
 
     /**
@@ -56,10 +54,12 @@ public class RequestHandler {
                     connection.setInfo(header.getSource().getAddress(), header.getSource().getPort());
 
                     if (header.getRequester() == Constants.REQUESTER.PRODUCER.ordinal()) {
+                        Channels.upsert(new Host(header.getSource().getAddress(), header.getSource().getPort()).toString(), connection);
                         processProducerRequest(header, requestOrResponse);
                     } else if (header.getRequester() == Constants.REQUESTER.SERVER.ordinal()) {
                         processServerRequest(header, requestOrResponse);
                     } else if (header.getRequester() == Constants.REQUESTER.CONSUMER.ordinal()) {
+                        Channels.upsert(new Host(header.getSource().getAddress(), header.getSource().getPort()).toString(), connection);
                         processConsumerRequest(connection.getDestination(), header, requestOrResponse);
                     }
                 }
@@ -111,14 +111,16 @@ public class RequestHandler {
 
                 Packet<AppendEntriesRequest> packet = JSONDeserializer.deserializePacket(body, new TypeToken<Packet<AppendEntriesRequest>>(){}.getType());
                 if (packet != null && packet.getObject() != null) {
-                    replication.appendEntries(packet.getObject());
+                    Replication.appendEntries(packet.getObject());
                 }
             } else if (header.getType() == Constants.HEADER_TYPE.ENTRY_RESP.ordinal()) {
                 logger.info(String.format("[%s] Received AppendEntry response packet from follower: %s.", CacheManager.getLocal().toString(), connection.getDestination().toString()));
 
                 Packet<AppendEntriesResponse> packet = JSONDeserializer.deserializePacket(body, new TypeToken<Packet<AppendEntriesResponse>>(){}.getType());
                 if (packet != null && packet.getObject() != null) {
-                    replication.processAcknowledgement(packet.getObject());
+                    Replication.processAcknowledgement(packet.getObject());
+                } else {
+                    logger.info(String.format("[%s] Not found response packet inside the packet sent from follower: %s", CacheManager.getLocal().toString(), connection.getDestination().toString()));
                 }
             } else if (header.getType() == Constants.HEADER_TYPE.VOTE_REQ.ordinal()) {
                 logger.info(String.format("[%s] Received VoteRequest packet from candidate %s", CacheManager.getLocal().toString(), connection.getDestination().toString()));

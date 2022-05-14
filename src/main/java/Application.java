@@ -2,23 +2,15 @@ import application.configuration.Config;
 import application.controllers.Client;
 import application.controllers.Consumer;
 import application.controllers.Producer;
-import configuration.Constants;
-import controllers.Connection;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-import org.apache.logging.log4j.ThreadContext;
 import consensus.controllers.CacheManager;
+import org.apache.logging.log4j.ThreadContext;
 import utils.JSONDeserializer;
 import utils.Strings;
 
 import java.io.BufferedReader;
 import java.io.IOException;
-import java.net.ServerSocket;
-import java.net.Socket;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 /**
  * An application to send logs to the consumer of the system.
@@ -26,14 +18,9 @@ import java.util.concurrent.Executors;
  * @author Palak Jain
  */
 public class Application {
-    private static final Logger logger = LogManager.getLogger(Application.class);
     private Client client;
-    private ExecutorService threadPool;
-    private boolean running;
 
     public Application() {
-        threadPool = Executors.newFixedThreadPool(Constants.NUM_OF_THREADS);
-        running = true;
     }
 
     public static void main(String[] args) {
@@ -51,14 +38,6 @@ public class Application {
                 } else if (config.isConsumer()) {
                     application.client = new Consumer(config);
                 }
-
-                //Joining to the network
-                logger.info(String.format("[%s] Listening on port %d.", config.getLocal().getAddress(), config.getLocal().getPort()));
-                System.out.printf("[%s] Listening on port %d.\n", config.getLocal().getAddress(), config.getLocal().getPort());
-
-                //Starting thread to listen for the connections to get
-                Thread connectionThread = new Thread(() -> application.listen(config));
-                connectionThread.start();
 
                 if (config.isProducer()) {
                     application.client.send();
@@ -117,33 +96,5 @@ public class Application {
         }
 
         return flag;
-    }
-
-    /**
-     * Listen for new connections from consumer/consensus system to receive response packet
-     */
-    private void listen(Config config) {
-        ServerSocket serverSocket;
-
-        try {
-            serverSocket = new ServerSocket(config.getLocal().getPort());
-        } catch (IOException exception) {
-            logger.error(String.format("Fail to start the producer at the node %s: %d.", config.getLocal().getAddress(), config.getLocal().getPort()), exception);
-            return;
-        }
-
-        while (running) {
-            try {
-                ThreadContext.put("module", config.getLocal().getName());
-                Socket socket = serverSocket.accept();
-                logger.debug(String.format("[%s] Received the connection from server.", config.getLocal().toString()));
-                Connection connection = new Connection(socket, socket.getInetAddress().getHostAddress(), socket.getPort());
-                if (connection.openConnection()) {
-                    threadPool.execute(() -> client.listenForResponse(connection));
-                }
-            } catch (IOException exception) {
-                logger.error(String.format("[%s:%d] Fail to accept the connection from another host. ", config.getLocal().getAddress(), config.getLocal().getPort()), exception);
-            }
-        }
     }
 }

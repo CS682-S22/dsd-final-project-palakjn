@@ -65,7 +65,7 @@ public class FileManager {
             inputStream.getChannel().position(fromOffset);
             int result = inputStream.read(data);
             if(result != length) {
-                logger.warn(String.format("[%s] Not able to send data. Read %d number of bytes. Expected %d number of bytes.", CacheManager.getLocal().toString(), result, length));
+                logger.warn(String.format("[%s] Read %d number of bytes. Expected %d number of bytes.", CacheManager.getLocal().toString(), result, length));
                 data = null;
             }
         } catch (IndexOutOfBoundsException | IOException exception) {

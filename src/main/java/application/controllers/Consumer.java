@@ -3,6 +3,8 @@ package application.controllers;
 import application.configuration.Config;
 import com.google.gson.reflect.TypeToken;
 import configuration.Constants;
+import consensus.controllers.Channels;
+import controllers.Connection;
 import models.Packet;
 import models.PullRequest;
 import models.PullResponse;
@@ -10,10 +12,6 @@ import org.apache.logging.log4j.LogManager;
 import utils.FileManager;
 import utils.JSONDeserializer;
 import utils.PacketHandler;
-import utils.Strings;
-
-import java.util.Scanner;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Periodically send PULL request to pull n number of logs from the arbitrary offset
@@ -36,58 +34,57 @@ public class Consumer extends Client {
      */
     @Override
     public void pull() {
-        Scanner input = new Scanner(System.in);
+        while (true) {
+            if (broker == null) {
+                setNewBroker();
+            }
 
-        System.out.print("Enter to send new pull request to leader (Enter 'exit' to exit): ");
-        String output =  input.nextLine();
-
-        while (!Strings.isNullOrEmpty(output)) {
-            logger.info(String.format("[%s] Getting %d logs from leader %s from the offset %d.", config.getLocal().toString(), config.getNumOfLogs(), config.getLeader().toString(), config.getOffset()));
+            logger.info(String.format("[%s] Getting %d logs from leader %s from the offset %d.", config.getLocal().toString(), config.getNumOfLogs(), broker.toString(), config.getOffset()));
             PullRequest pullRequest = new PullRequest(config.getOffset(), config.getNumOfLogs());
             Packet<PullRequest> packet = new Packet<>(Constants.RESPONSE_STATUS.OK.ordinal(), pullRequest);
-            byte[] data = PacketHandler.createPacket(Constants.REQUESTER.CONSUMER, Constants.HEADER_TYPE.PULL_REQ, packet, config.getOffset(), config.getLeader());
-            config.getLeader().send(data);
+            byte[] data = PacketHandler.createPacket(Constants.REQUESTER.CONSUMER, Constants.HEADER_TYPE.PULL_REQ, packet, config.getOffset(), broker);
 
-            byte[] response = null;
+            if (broker.send(data)) {
+                Connection connection = Channels.get(broker.toString());
+                connection.setTimer(Constants.CONSUMER_WAIT_TIME);
+                byte[] response = connection.receive();
 
-            try {
-                response = responseQueue.poll(Constants.CONSUMER_WAIT_TIME, TimeUnit.MILLISECONDS);
-            } catch (InterruptedException e) {
-                logger.error(String.format("[%s] Unable to pull the response received from the leader from the queue.", config.getLocal().toString()), e);
-            }
+                if (response != null) {
+                    if (processResponse(response, config.getOffset())) {
+                        byte[] body = PacketHandler.getData(response);
 
-            if (response != null) {
-                if (processResponse(response, config.getOffset())) {
-                    byte[] body = PacketHandler.getData(response);
+                        if (body != null) {
+                            Packet<PullResponse> pullResponsePacket = JSONDeserializer.deserializePacket(body, new TypeToken<Packet<PullResponse>>() {
+                            }.getType());
 
-                    if (body != null) {
-                        Packet<PullResponse> pullResponsePacket = JSONDeserializer.deserializePacket(body, new TypeToken<Packet<PullResponse>>() {}.getType());
+                            if (pullResponsePacket != null && pullResponsePacket.getObject() != null) {
+                                PullResponse pullResponse = pullResponsePacket.getObject();
 
-                        if (pullResponsePacket != null && pullResponsePacket.getObject() != null) {
-                            PullResponse pullResponse = pullResponsePacket.getObject();
+                                logger.info(String.format("[%s] Received %d number of logs [Expected %d] from the leader %s with nextOffset as %d.", config.getLocal().toString(), pullResponse.getNumOfLogs(), config.getNumOfLogs(), broker.toString(), pullResponse.getNextOffset()));
 
-                            logger.info(String.format("[%s] Received %d number of logs [Expected %d] from the leader %s with nextOffset as %d.", config.getLocal().toString(), pullResponse.getNumOfLogs(), config.getNumOfLogs(), config.getLeader().toString(), pullResponse.getNextOffset()));
+                                int index = 0;
+                                while (index < pullResponse.getNumOfLogs()) {
+                                    byte[] content = pullResponse.getData(index);
+                                    FileManager.write(config.getLocation(), content);
 
-                            int index = 0;
-                            while (index < pullResponse.getNumOfLogs()) {
-                                byte[] content = pullResponse.getData(index);
-                                FileManager.write(config.getLocation(), content);
+                                    index++;
+                                }
 
-                                index++;
+                                config.setOffset(pullResponse.getNextOffset());
+                            } else {
+                                logger.warn(String.format("[%s] Either unable to parse received pull response or pull response object is null. Resending packet", config.getLocal().toString()));
                             }
-
-                            config.setOffset(pullResponse.getNextOffset());
-                        } else {
-                            logger.warn(String.format("[%s] Either unable to parse received pull response or pull response object is null. Resending packet", config.getLocal().toString()));
                         }
                     }
+                } else {
+                    logger.warn(String.format("[%s] Timeout happen and consumer haven't received the packet with the sequence number %d. Retrying.", config.getLocal().toString(), config.getOffset()));
+                    Channels.remove(broker.toString());
+                    broker = null;
                 }
             } else {
-                logger.warn(String.format("[%s] Timeout happen and consumer haven't received the packet with the sequence number %d. Retrying.", config.getLocal().toString(), config.getOffset()));
+                Channels.remove(broker.toString());
+                broker = null;
             }
-
-            System.out.print("Enter to send new pull request to leader (Enter 'exit' to exit): ");
-            output =  input.nextLine();
         }
     }
 }

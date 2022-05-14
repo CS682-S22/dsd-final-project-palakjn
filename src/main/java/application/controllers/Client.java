@@ -3,49 +3,24 @@ package application.controllers;
 import application.configuration.Config;
 import com.google.gson.reflect.TypeToken;
 import configuration.Constants;
-import controllers.Connection;
+import consensus.controllers.Channels;
 import models.Header;
 import models.Host;
 import models.Packet;
 import org.apache.logging.log4j.Logger;
-import org.apache.logging.log4j.ThreadContext;
 import utils.JSONDeserializer;
 import utils.PacketHandler;
 
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingDeque;
-
 public abstract class Client {
-    protected BlockingQueue<byte[]> responseQueue;
     protected Logger logger;
     protected Config config;
+    protected Host broker;
+    protected int brokerNum;
 
     public Client(Logger logger, Config config) {
-        responseQueue = new LinkedBlockingDeque<>();
         this.logger = logger;
         this.config = config;
-    }
-
-    /**
-     * Listen for the response either from consumer service/leader of the consensus system
-     */
-    public void listenForResponse(Connection connection) {
-        ThreadContext.put("module", config.getLocal().getName());
-
-        while (connection.isOpen()) {
-            byte[] data = connection.receive();
-            if (data != null) {
-                logger.info(String.format("[%s] Received the response from the leader: %s", config.getLocal().toString(), connection.getDestination().toString()));
-
-                try {
-                    responseQueue.put(data);
-                } catch (InterruptedException e) {
-                    logger.error(String.format("[%s] Unable to add the response received from the leader to the queue.", config.getLocal().toString()), e);
-                }
-            } else if (!connection.isOpen()) {
-                logger.warn(String.format("[%s] Connection is closed by the leader.", config.getLocal().toString()));
-            }
-        }
+        brokerNum = -1;
     }
 
     /**
@@ -73,10 +48,11 @@ public abstract class Client {
                         if (packet != null) {
                             if (packet.getStatus() == Constants.RESPONSE_STATUS.REDIRECT.ordinal()) {
                                 if (packet.getObject() != null) {
-                                    logger.info(String.format("[%s] Leader changed. Sending data to the server %s with the sequence number %d.", config.getLocal().toString(), packet.getObject().toString(), offset));
-                                    config.setLeader(packet.getObject());
+                                    logger.info(String.format("[%s] Leader changed as per broker %s. Sending data to the server %s with the sequence number %d.", config.getLocal().toString(), broker.toString(), packet.getObject().toString(), offset));
+                                    Channels.remove(broker.toString());
+                                    broker = packet.getObject();
                                 } else {
-                                    logger.warn(String.format("[%s] Leader changed but not found the leader info in the packet. Re-sending the same packet to the server %s with the seqNum as %d.", config.getLocal().toString(), config.getLeader().toString(), offset));
+                                    logger.warn(String.format("[%s] Leader changed but not found the leader info in the packet. Re-sending the same packet to the server %s with the seqNum as %d.", config.getLocal().toString(), broker.toString(), offset));
                                 }
                             } else if (packet.getStatus() == Constants.RESPONSE_STATUS.ELECTION.ordinal()) {
                                 logger.info(String.format("[%s] Leader changed. Election process going on. Sleeping for %d time before retrying for the seqNum %d.", config.getLocal().toString(), Constants.CLIENT_SLEEP_TIME, offset));
@@ -86,17 +62,28 @@ public abstract class Client {
                                     logger.error(String.format("[%s] Error while sleeping for %d amount of time.", config.getLocal().toString(), Constants.CLIENT_SLEEP_TIME), e);
                                 }
                             } else {
-                                logger.warn(String.format("[%s] Received invalid response status %d from the server %s.", config.getLocal().toString(), packet.getStatus(), config.getLeader().toString()));
+                                logger.warn(String.format("[%s] Received invalid response status %d from the server %s.", config.getLocal().toString(), packet.getStatus(), broker.toString()));
                             }
                         }
                     }
                 }
             } else {
-                logger.info(String.format("[%s] Received the response with the sequence number: %d. Expected sequence number: %d from leader %s.", config.getLocal().toString(), header.getSeqNum(), offset, config.getLeader().toString()));
+                logger.info(String.format("[%s] Received the response with the sequence number: %d. Expected sequence number: %d from leader %s.", config.getLocal().toString(), header.getSeqNum(), offset, broker.toString()));
             }
         }
 
         return isSuccess;
+    }
+
+    /**
+     * Set the broker
+     */
+    protected void setNewBroker() {
+        brokerNum++;
+        if (brokerNum == config.getMemberCount()) {
+            brokerNum = 0;
+        }
+        broker = config.getMember(brokerNum);
     }
 
     /**

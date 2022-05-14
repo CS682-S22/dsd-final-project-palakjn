@@ -1,6 +1,7 @@
 package consensus.controllers;
 
 import configuration.Constants;
+import consensus.controllers.database.EntryDB;
 import consensus.models.AppendEntriesRequest;
 import consensus.models.AppendEntriesResponse;
 import consensus.models.Entry;
@@ -26,6 +27,11 @@ import java.util.TimerTask;
 public class Replication {
     private static final Logger logger = LogManager.getLogger(Replication.class);
     private static Timer timer;
+
+    private static final Object appendLock = new Object();
+    private static final Object commitLock = new Object();
+
+    private Replication() {}
 
     /**
      * Start the timer to replicate the logs to followers if the current server is the leader
@@ -74,80 +80,94 @@ public class Replication {
     /**
      * Accept the new logs from the leader if last received log term and index matches with the leader
      */
-    public void appendEntries(AppendEntriesRequest appendEntriesRequest) {
-        int currentTerm = CacheManager.getTerm();
-        Host leader = CacheManager.getNeighbor(appendEntriesRequest.getLeaderId());
+    public static void appendEntries(AppendEntriesRequest appendEntriesRequest) {
+        synchronized (appendLock) {
+            int currentTerm = CacheManager.getTerm();
+            Host leader = CacheManager.getNeighbor(appendEntriesRequest.getLeaderId());
 
-        if (appendEntriesRequest.getTerm() > currentTerm) {
-            logger.info(String.format("[%s] Received AppendEntries from new leader %s with the new term %d. Old term: %d", CacheManager.getLocal().toString(), leader.toString(), appendEntriesRequest.getTerm(), currentTerm));
-            CacheManager.setTerm(appendEntriesRequest.getTerm());
-            CacheManager.setVoteFor(-1);
-            Election.stopTimer();
-            FaultDetector.startTimer();
+            if (appendEntriesRequest.getTerm() > currentTerm) {
+                logger.info(String.format("[%s] Received AppendEntries from new leader %s with the new term %d. Old term: %d", CacheManager.getLocal().toString(), leader.toString(), appendEntriesRequest.getTerm(), currentTerm));
+                CacheManager.setTerm(appendEntriesRequest.getTerm());
+                CacheManager.setVoteFor(-1, false);
+                Election.stopTimer();
+                FaultDetector.startTimer();
+            }
+
+            if (appendEntriesRequest.getTerm() == currentTerm) {
+                CacheManager.setCurrentRole(Constants.ROLE.FOLLOWER.ordinal());
+                CacheManager.setCurrentLeader(appendEntriesRequest.getLeaderId());
+                FaultDetector.heartBeatReceived();
+            }
+
+            boolean logOk = CacheManager.getLogLength() >= appendEntriesRequest.getPrefixLen() &&
+                    (appendEntriesRequest.getPrefixLen() == 0 || CacheManager.getEntry(appendEntriesRequest.getPrefixLen() - 1).getTerm() == appendEntriesRequest.getPrefixTerm());
+
+            int ack = 0;
+            boolean isSuccess = false;
+
+            int termAtPrefixLen = -1;
+
+            if (appendEntriesRequest.getPrefixLen() > 0) {
+                Entry entry = CacheManager.getEntry(appendEntriesRequest.getPrefixLen() - 1);
+                if (entry != null) termAtPrefixLen = entry.getTerm();
+            }
+
+            if (appendEntriesRequest.getTerm() == currentTerm && logOk) {
+                logger.info(String.format("[%s] Accepted %d number of logs from leader %s.  CurrentTerm: %d, LeaderTerm: %d, log.length: %d,\" +\n" +
+                        "                                \"prefixLen: %d, logs[prefixLen].term: %d, prefixTerm: %d", CacheManager.getLocal().toString(), appendEntriesRequest.getLength(), leader.toString(), currentTerm, appendEntriesRequest.getTerm(),
+                        CacheManager.getLogLength(), appendEntriesRequest.getPrefixLen(), termAtPrefixLen, appendEntriesRequest.getPrefixTerm()));
+                writeLogs(appendEntriesRequest);
+                ack = appendEntriesRequest.getPrefixLen() + appendEntriesRequest.getLength();
+                isSuccess = true;
+            } else {
+                logger.warn(String.format("[%s] Rejecting the logs from the leader %s. CurrentTerm: %d, LeaderTerm: %d, log.length: %d," +
+                                "prefixLen: %d, logs[prefixLen].term: %d, prefixTerm: %d", CacheManager.getLocal().toString(), leader.toString(), currentTerm, appendEntriesRequest.getTerm(),
+                        CacheManager.getLogLength(), appendEntriesRequest.getPrefixLen(), termAtPrefixLen, appendEntriesRequest.getPrefixTerm()));
+            }
+
+            AppendEntriesResponse response = new AppendEntriesResponse(currentTerm, ack, CacheManager.getLocal().getId(), isSuccess);
+            Packet<AppendEntriesResponse> packet = new Packet<>(Constants.RESPONSE_STATUS.OK.ordinal(), response);
+            byte[] responseBytes = PacketHandler.createPacket(Constants.REQUESTER.SERVER, Constants.HEADER_TYPE.ENTRY_RESP, packet, 0, leader);
+            leader.send(responseBytes);
         }
-
-        if (appendEntriesRequest.getTerm() == currentTerm) {
-            CacheManager.setCurrentRole(Constants.ROLE.FOLLOWER.ordinal());
-            CacheManager.setCurrentLeader(appendEntriesRequest.getLeaderId());
-            FaultDetector.heartBeatReceived();
-        }
-
-        boolean logOk = CacheManager.getLogLength() >= appendEntriesRequest.getPrefixLen() &&
-                (appendEntriesRequest.getPrefixLen() == 0 || CacheManager.getEntry(appendEntriesRequest.getPrefixLen() - 1).getTerm() == appendEntriesRequest.getPrefixTerm());
-
-        int ack = 0;
-        boolean isSuccess = false;
-
-        if (appendEntriesRequest.getTerm() == currentTerm && logOk) {
-            logger.info(String.format("[%s] Accepted %d number of logs from leader %s. Writing to local logs if not duplicate", CacheManager.getLocal().toString(), appendEntriesRequest.getLength(), leader.toString()));
-            writeLogs(appendEntriesRequest);
-            ack = appendEntriesRequest.getPrefixLen() + appendEntriesRequest.getLength();
-            isSuccess = true;
-        } else {
-            logger.warn(String.format("[%s] Rejecting the logs from the leader %s. CurrentTerm: %d, LeaderTerm: %d, log.length: %d," +
-                    "prefixLen: %d, logs[prefixLen].term: %d, prefixTerm: %d", CacheManager.getLocal().toString(), leader.toString(), currentTerm, appendEntriesRequest.getTerm(),
-                    CacheManager.getLogLength(), appendEntriesRequest.getPrefixLen(), appendEntriesRequest.getPrefixLen() == 0 ? -1 : CacheManager.getEntry(appendEntriesRequest.getPrefixLen() - 1).getTerm(), appendEntriesRequest.getPrefixTerm()));
-        }
-
-        AppendEntriesResponse response = new AppendEntriesResponse(currentTerm, ack, CacheManager.getLocal().getId(), isSuccess);
-        Packet<AppendEntriesResponse> packet = new Packet<>(Constants.RESPONSE_STATUS.OK.ordinal(), response);
-        byte[] responseBytes = PacketHandler.createPacket(Constants.REQUESTER.SERVER, Constants.HEADER_TYPE.ENTRY_RESP, packet, 0, leader);
-        leader.send(responseBytes);
     }
 
     /**
      * Receiving the acknowledgement from the follower
      */
-    public void processAcknowledgement(AppendEntriesResponse appendEntriesResponse) {
+    public static void processAcknowledgement(AppendEntriesResponse appendEntriesResponse) {
         int currentTerm = CacheManager.getTerm();
 
         Host follower = CacheManager.getNeighbor(appendEntriesResponse.getNodeId());
         if (appendEntriesResponse.getTerm() == currentTerm && CacheManager.getCurrentRole() == Constants.ROLE.LEADER.ordinal()) {
             if (appendEntriesResponse.isSuccess() && appendEntriesResponse.getAck() >= CacheManager.getAckedLength(follower.getId())) {
-                logger.info(String.format("[%s] Received an acknowledgement from the follower %s that it has received the total of %d logs till now.", CacheManager.getLocal().toString(), follower.getId(), appendEntriesResponse.getAck()));
+                logger.info(String.format("[%s] Received an acknowledgement from the follower %s that it has received the total of %d logs till now.", CacheManager.getLocal().toString(), follower.toString(), appendEntriesResponse.getAck()));
                 CacheManager.setSentLength(follower.getId(), appendEntriesResponse.getAck());
                 CacheManager.setAckedLength(follower.getId(), appendEntriesResponse.getAck());
                 commitLogEntries();
-            } else if (CacheManager.getSentLength(appendEntriesResponse.getNodeId()) > 0) {
+            } else if (CacheManager.getSentLength(follower.getId()) > 0) {
                 logger.info(String.format("[%s] Need to repair the logs with the follower %s as follower is behind the prefix logs. " +
-                        "Previously sent logs from %d position. Now, sending from %d position.", CacheManager.getLocal().toString(), follower.toString(), CacheManager.getSentLength(currentTerm), CacheManager.getSentLength(currentTerm) - 1));
+                        "Previously sent logs from %d position. Now, sending from %d position.", CacheManager.getLocal().toString(), follower.toString(), CacheManager.getSentLength(follower.getId()), CacheManager.getSentLength(follower.getId()) - 1));
                 CacheManager.decrementSentLength(follower.getId());
+            } else {
+                logger.info(String.format("[%s] Received an %d acknowledgement from the follower %s but previously received acknowledgement was %d", CacheManager.getLocal().toString(), appendEntriesResponse.getAck(), follower.toString(), CacheManager.getAckedLength(follower.getId())));
             }
         } else if (appendEntriesResponse.getTerm() > currentTerm) {
             logger.info(String.format("[%s] Leader's term %d is less that follower %s's term %d. Seems that there is a new leader in the system. " +
                     "Changing role to follower.", CacheManager.getLocal().toString(), currentTerm, follower.toString(), appendEntriesResponse.getTerm()));
             CacheManager.setTerm(appendEntriesResponse.getTerm());
             CacheManager.setCurrentRole(Constants.ROLE.FOLLOWER.ordinal());
-            CacheManager.setVoteFor(-1);
+            CacheManager.setVoteFor(-1, false);
             Election.stopTimer();
             FaultDetector.startTimer();
         }
+
     }
 
     /**
      * Write the logs received from leader to local
      */
-    private void writeLogs(AppendEntriesRequest appendEntriesRequest) {
+    private static void writeLogs(AppendEntriesRequest appendEntriesRequest) {
         Host leader = CacheManager.getNeighbor(appendEntriesRequest.getLeaderId());
         int index = 0;
 
@@ -171,7 +191,7 @@ public class Replication {
             while (index < appendEntriesRequest.getLength()) {
                 Entry entry = appendEntriesRequest.getSuffix(index);
 
-                if(CacheManager.addEntry(entry.getData(), entry.getClientId(), entry.getReceivedOffset())) {
+                if(CacheManager.addEntry(entry.getData(), entry.getTerm(), entry.getClientId(), entry.getReceivedOffset())) {
                     logger.info(String.format("[%s] Saved %d bytes of data from leader %s.", CacheManager.getLocal().toString(), entry.getData().length, leader.toString()));
                 } else {
                     logger.warn(String.format("[%s] Fail to write %d bytes of data from leader %s.", CacheManager.getLocal().toString(), entry.getData().length, leader.toString()));
@@ -199,31 +219,35 @@ public class Replication {
     /**
      * Commit log entries after receiving acknowledgements from the majority of the nodes
      */
-    private void commitLogEntries() {
-        int logLength = CacheManager.getLogLength();
-        int commitLength = CacheManager.getCommitLength();
-        List<Host> nodes = CacheManager.getNeighbors();
+    private static void commitLogEntries() {
+        synchronized (commitLock) {
+            int logLength = CacheManager.getLogLength();
+            int commitLength = CacheManager.getCommitLength();
+            List<Host> nodes = CacheManager.getMembers();
 
-        logger.info(String.format("[%s] [Leader] %s logs as commitLength: %d and logLength: %d.", CacheManager.getLocal().toString(),
-                commitLength < logLength ? "Will try to commit" : "Will not commit", commitLength, logLength));
+            logger.info(String.format("[%s] [Leader] %s logs as commitLength: %d and logLength: %d.", CacheManager.getLocal().toString(),
+                    commitLength < logLength ? "Will try to commit" : "Will not commit", commitLength, logLength));
 
-        while (commitLength < logLength) {
-            int ack = 0;
+            while (commitLength < logLength) {
+                int ack = 0;
 
-            for (Host node : nodes) {
-                if (CacheManager.getAckedLength(node.getId()) > commitLength) {
-                    ack = ack + 1;
+                for (Host node : nodes) {
+                    if (CacheManager.getAckedLength(node.getId()) > commitLength) {
+                        logger.info(String.format("[%s] Follower %s acknowledged for %d packets where commit length is %d.", CacheManager.getLocal().toString(), node.toString(), CacheManager.getAckedLength(node.getId()), commitLength));
+                        ack = ack + 1;
+                    }
                 }
-            }
 
-            if (ack >= Math.ceil((CacheManager.getMemberCount() + 1) / 2.0)) {
-                if (sendToBroker(commitLength)) {
-                    commitLength++;
+                if (ack >= Math.ceil((CacheManager.getMemberCount() + 1) / 2.0)) {
+                    if (sendToBroker(commitLength)) {
+                        commitLength++;
+                    } else {
+                        break;
+                    }
                 } else {
+                    logger.info(String.format("[%s] Not committing as received only %d acknowledgments but wanted least %f acknowledgements", CacheManager.getLocal().toString(), ack, Math.ceil((CacheManager.getMemberCount() + 1) / 2.0)));
                     break;
                 }
-            } else {
-                break;
             }
         }
     }
@@ -236,14 +260,16 @@ public class Replication {
         boolean isSuccess = false;
 
         Entry entry = CacheManager.getEntry(commitLength);
-        byte[] data = FileManager.read(CacheManager.getLocation(), entry.getFromOffset(), (entry.getToOffset() + 1) - entry.getFromOffset());
-        if (data != null && Broker.publish(entry.getClientId(), data, entry.getReceivedOffset())) {
-            commitLength++;
-            CacheManager.setCommitLength(commitLength);
-            entry.setCommitted();
-            isSuccess = true;
+        if (entry != null) {
+            byte[] data = FileManager.read(CacheManager.getLocation(), entry.getFromOffset(), (entry.getToOffset() + 1) - entry.getFromOffset());
+            if (data != null && Broker.publish(entry.getClientId(), data, entry.getReceivedOffset())) {
+                commitLength++;
+                CacheManager.setCommitLength(commitLength);
+                entry.setCommitted();
+                EntryDB.setCommitted(entry.getFromOffset(), true);
+                isSuccess = true;
+            }
         }
-
         return isSuccess;
     }
 
@@ -253,6 +279,7 @@ public class Replication {
     private static void replicate(int currentTerm, Host follower) {
         //Getting the length of the logs already being sent to the follower before
         int prefixLen = CacheManager.getSentLength(follower.getId());
+        logger.info(String.format("[%s] Need to send logs from the prefixLen: %d to the follower: %s", CacheManager.getLocal().toString(), prefixLen, follower.toString()));
 
         //Getting batch of 10 logs metadata from the prefixLen
         List<Entry> entries = CacheManager.getEntries(prefixLen, Constants.SUFFIX_BATCH_SIZE, false);

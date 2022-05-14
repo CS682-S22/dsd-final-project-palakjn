@@ -1,11 +1,10 @@
 package consensus.controllers;
 
-import configuration.Constants;
-import consensus.controllers.database.StateDB;
-import models.Host;
 import consensus.controllers.database.EntryDB;
+import consensus.controllers.database.StateDB;
 import consensus.models.Entry;
 import consensus.models.NodeState;
+import models.Host;
 import utils.FileManager;
 import utils.Strings;
 
@@ -88,6 +87,19 @@ public class CacheManager {
     }
 
     /**
+     * Get all the members
+     */
+    public static List<Host> getMembers() {
+        memberLock.readLock().lock();
+
+        try {
+            return members.getMembers();
+        } finally {
+            memberLock.readLock().unlock();
+        }
+    }
+
+    /**
      * Get the number of members in the system
      */
     public static int getMemberCount() {
@@ -107,7 +119,7 @@ public class CacheManager {
         statusLock.writeLock().lock();
         CacheManager.nodeState = new NodeState(nodeState);
 
-        StateDB.update(CacheManager.nodeState);
+        StateDB.upsert(CacheManager.nodeState);
         statusLock.writeLock().unlock();
     }
 
@@ -133,7 +145,7 @@ public class CacheManager {
         nodeState.setTerm(term);
 
         try {
-            StateDB.update(CacheManager.nodeState);
+            StateDB.upsert(CacheManager.nodeState);
             return nodeState.getTerm();
         } finally {
             statusLock.writeLock().unlock();
@@ -172,7 +184,7 @@ public class CacheManager {
     public static void setCommitLocation(String location) {
         statusLock.writeLock().lock();
         nodeState.setCommitLocation(location);
-        StateDB.update(CacheManager.nodeState);
+        StateDB.upsert(CacheManager.nodeState);
         statusLock.writeLock().unlock();
     }
 
@@ -182,7 +194,7 @@ public class CacheManager {
     public static void setLocation(String location) {
         statusLock.writeLock().lock();
         nodeState.setLocation(location);
-        StateDB.update(CacheManager.nodeState);
+        StateDB.upsert(CacheManager.nodeState);
         statusLock.writeLock().unlock();
     }
 
@@ -193,7 +205,7 @@ public class CacheManager {
         statusLock.writeLock().lock();
 
         nodeState.incrementTerm();
-        StateDB.update(CacheManager.nodeState);
+        StateDB.upsert(CacheManager.nodeState);
 
         statusLock.writeLock().unlock();
         return nodeState.getTerm();
@@ -215,19 +227,19 @@ public class CacheManager {
     /**
      * Set the candidate id for whom the follower given the vote for the given term
      */
-    public static boolean setVoteFor(int nodeId) {
+    public static boolean setVoteFor(int nodeId, boolean force) {
         statusLock.writeLock().lock();
 
         boolean isVoted = false;
 
         if (nodeId == -1) {
             nodeState.setVoteFor(-1);
-        } else if (nodeState.getVotedFor() == -1 || nodeState.getVotedFor() == nodeId) {
+        } else if (force || nodeState.getVotedFor() == -1 || nodeState.getVotedFor() == nodeId) {
             nodeState.setVoteFor(nodeId);
             isVoted = true;
         }
 
-        StateDB.update(CacheManager.nodeState);
+        StateDB.upsert(CacheManager.nodeState);
         statusLock.writeLock().unlock();
         return isVoted;
     }
@@ -251,6 +263,7 @@ public class CacheManager {
     public static void setCommitLength(int commitLength) {
         dataLock.writeLock().lock();
         nodeState.setCommitLength(commitLength);
+        StateDB.upsert(CacheManager.nodeState);
         dataLock.writeLock().unlock();
     }
 
@@ -274,7 +287,7 @@ public class CacheManager {
         statusLock.writeLock().lock();
 
         nodeState.setCurrentRole(currentRole);
-        StateDB.update(CacheManager.nodeState);
+        StateDB.upsert(CacheManager.nodeState);
 
         statusLock.writeLock().unlock();
     }
@@ -299,7 +312,7 @@ public class CacheManager {
         statusLock.writeLock().lock();
 
         nodeState.setCurrentLeader(currentLeader);
-        StateDB.update(CacheManager.nodeState);
+        StateDB.upsert(CacheManager.nodeState);
 
         statusLock.writeLock().unlock();
     }
@@ -333,7 +346,7 @@ public class CacheManager {
     public static void setSentLength(int nodeId, int length) {
         dataLock.writeLock().lock();
 
-        sentLength.add(nodeId, length);
+        sentLength.set(nodeId, length);
 
         dataLock.writeLock().unlock();
     }
@@ -361,7 +374,7 @@ public class CacheManager {
         dataLock.writeLock().lock();
 
         int length = sentLength.get(nodeId);
-        sentLength.add(nodeId, length - 1);
+        sentLength.set(nodeId, length - 1);
 
         dataLock.writeLock().unlock();
     }
@@ -384,7 +397,7 @@ public class CacheManager {
      */
     public static void setAckedLength(int nodeId, int length) {
         dataLock.writeLock().lock();
-        ackedLength.add(nodeId, length);
+        ackedLength.set(nodeId, length);
         dataLock.writeLock().unlock();
     }
 
@@ -404,7 +417,7 @@ public class CacheManager {
     /**
      * Append log to the local file and add term, offset information as new entry to in-memory and db
      */
-    public static boolean addEntry(byte[] log, String clientId, int clientOffset) {
+    public static boolean addEntry(byte[] log, int term, String clientId, int clientOffset) {
         dataLock.writeLock().lock();
         //Writing log data to local file
         int offset = getLastOffset(false);
@@ -412,7 +425,7 @@ public class CacheManager {
 
         if (isSuccess) {
             //Adding new entry to in-memory data structure
-            Entry entry = new Entry(getTerm(), offset, offset + log.length - 1, clientId, clientOffset, false);
+            Entry entry = new Entry(term, offset, offset + log.length - 1, clientId, clientOffset, false);
             entries.add(entry);
 
             //Adding new entry to SQL
@@ -555,10 +568,15 @@ public class CacheManager {
         dataLock.writeLock().lock();
 
         Entry entry = entries.get(index);
+        int fromOffset = entry.getFromOffset();
 
+        List<Entry> temp = new ArrayList<>();
 
-        int fromOffset = entries.get(index).getFromOffset();
-        entries.subList(index, entries.size() - 1).clear();
+        for (int i = 0; i < index; i++) {
+            temp.add(entries.get(i));
+        }
+
+        entries = temp;
         EntryDB.deleteFrom(fromOffset);
 
         dataLock.writeLock().unlock();

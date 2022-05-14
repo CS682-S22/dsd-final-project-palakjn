@@ -2,6 +2,8 @@ package application.controllers;
 
 import application.configuration.Config;
 import configuration.Constants;
+import consensus.controllers.Channels;
+import controllers.Connection;
 import org.apache.logging.log4j.LogManager;
 import utils.PacketHandler;
 import utils.Strings;
@@ -10,7 +12,7 @@ import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.concurrent.TimeUnit;
+import java.util.Scanner;
 
 /**
  * Responsible for reading logs from the file and sending to the leader of the system.
@@ -31,27 +33,40 @@ public class Producer extends Client {
         try (BufferedReader reader = new BufferedReader(new FileReader(config.getLocation()))) {
             String line = reader.readLine();
             int offset = 0;
+            Scanner input = new Scanner(System.in);
 
             while (!Strings.isNullOrEmpty(line)) {
-                byte[] data = PacketHandler.createPacket(Constants.REQUESTER.PRODUCER, Constants.HEADER_TYPE.DATA, line.getBytes(StandardCharsets.UTF_8), offset, config.getLeader());
-                logger.info(String.format("[%s] Sending %d bytes of data to the leader of the system %s.", config.getLocal().toString(), data.length, config.getLeader().toString()));
-                config.getLeader().send(data);
-
-                byte[] response = null;
-
-                try {
-                    response = responseQueue.poll(Constants.PRODUCER_WAIT_TIME, TimeUnit.MILLISECONDS);
-                } catch (InterruptedException e) {
-                    logger.error(String.format("[%s] Unable to pull the response received from the leader from the queue.", config.getLocal().toString()), e);
+                if (config.isPressEnterToSend()) {
+                    System.out.print("Enter to send new log to the broker: ");
+                    input.nextLine();
                 }
 
-                if (response != null) {
-                    if (processResponse(response, offset)) {
-                        offset += line.length();
-                        line = reader.readLine();
+                if (broker == null) {
+                    setNewBroker();
+                }
+
+                byte[] data = PacketHandler.createPacket(Constants.REQUESTER.PRODUCER, Constants.HEADER_TYPE.DATA, line.getBytes(StandardCharsets.UTF_8), offset, broker);
+                logger.info(String.format("[%s] Sending %d bytes of data to the leader of the system %s.", config.getLocal().toString(), data.length, broker.toString()));
+                if (broker.send(data)) {
+                    Connection connection = Channels.get(broker.toString());
+                    connection.setTimer(Constants.PRODUCER_WAIT_TIME);
+                    byte[] response = connection.receive();
+
+                    if (response != null) {
+                        if (processResponse(response, offset)) {
+                            offset += line.length();
+                            line = reader.readLine();
+                        } else {
+                            logger.debug(String.format("[%s] Re-sending same log again to the leader %s", config.getLocal().toString(), broker.toString()));
+                        }
+                    } else {
+                        logger.warn(String.format("[%s] Timeout happen and client haven't received the acknowledgement of the packet with the sequence number %d. Might be leader failed. Sending request to another host.", config.getLocal().toString(), offset));
+                        Channels.remove(broker.toString());
+                        broker = null;
                     }
                 } else {
-                    logger.warn(String.format("[%s] Timeout happen and client haven't received the acknowledgement of the packet with the sequence number %d. Retrying.", config.getLocal().toString(), offset));
+                    Channels.remove(broker.toString());
+                    broker = null;
                 }
             }
         } catch (IOException exception) {

@@ -49,6 +49,7 @@ public class Host {
                 port = Integer.parseInt(parts[1]);
             }
         }
+        this.nodeService = new NodeService();
     }
 
     public Host() {

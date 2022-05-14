@@ -52,7 +52,7 @@ public class NodeService {
         }
 
         if (leader != null) {
-            logger.info(String.format("[%s] [Follower] Received the request from consumer/producer %s. Sending leader %s information to the consumer/producer.", CacheManager.getLocal().toString(), client.toString(), leader.toString()));
+            logger.info(String.format("[%s] [Follower] Received the request from consumer/producer %s. Sending leader %s[%d] information to the consumer/producer.", CacheManager.getLocal().toString(), client.toString(), leader.toString(), leaderId));
             Packet<Host> response = new Packet<>(Constants.RESPONSE_STATUS.REDIRECT.ordinal(), leader);
             byte[] responseBytes = PacketHandler.createPacket(Constants.REQUESTER.SERVER, Constants.HEADER_TYPE.RESP, response, seqNum, client);
             client.send(responseBytes);

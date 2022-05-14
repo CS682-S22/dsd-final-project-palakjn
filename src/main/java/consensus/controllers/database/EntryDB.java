@@ -89,4 +89,22 @@ public class EntryDB {
 
         return entries;
     }
+
+    /**
+     * Update entry with the given fromOffset and serverId
+     */
+    public static void setCommitted(int fromOffset, boolean isCommitted) {
+        try (Connection connection = DataSource.getConnection()) {
+            String query = "UPDATE entries set isCommitted = ? WHERE fromOffset = ? AND serverId = ?";
+
+            PreparedStatement statement = connection.prepareStatement(query);
+            statement.setBoolean(1, isCommitted);
+            statement.setInt(2, fromOffset);
+            statement.setInt(3, CacheManager.getLocal().getId());
+
+            statement.executeUpdate();
+        } catch (SQLException sqlException) {
+            logger.error(String.format("[%s] Error while updating 'isCommitted' field to %b for the fromOffset: %d", CacheManager.getLocal().toString(), fromOffset), sqlException);
+        }
+    }
 }

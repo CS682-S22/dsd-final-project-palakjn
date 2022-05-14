@@ -78,14 +78,16 @@ public class StateDB {
      */
     public static void update(NodeState nodeState) {
         try (Connection connection = DataSource.getConnection()) {
-            String query = "UPDATE state SET term = ?, votedFor = ?, commitLength = ?, leader = ? WHERE id = ?";
+            String query = "UPDATE state SET term = ?, votedFor = ?, commitLength = ?, leader = ?, commitLocation = ?, location = ? WHERE id = ?";
 
             PreparedStatement statement = connection.prepareStatement(query);
             statement.setInt(1, nodeState.getTerm());
             statement.setInt(2, nodeState.getVotedFor());
             statement.setInt(3, nodeState.getCommitLength());
             statement.setInt(4, nodeState.getCurrentLeader());
-            statement.setInt(5, CacheManager.getLocal().getId());
+            statement.setString(5, nodeState.getCommitLocation());
+            statement.setString(6, nodeState.getLocation());
+            statement.setInt(7, CacheManager.getLocal().getId());
 
             statement.executeUpdate();
         } catch (SQLException sqlException) {
