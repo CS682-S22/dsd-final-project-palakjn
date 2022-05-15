@@ -12,6 +12,9 @@ import org.apache.logging.log4j.LogManager;
 import utils.FileManager;
 import utils.JSONDeserializer;
 import utils.PacketHandler;
+import utils.Strings;
+
+import java.util.Scanner;
 
 /**
  * Periodically send PULL request to pull n number of logs from the arbitrary offset
@@ -34,7 +37,12 @@ public class Consumer extends Client {
      */
     @Override
     public void pull() {
-        while (true) {
+        Scanner input = new Scanner(System.in);
+
+        System.out.print("Enter to send new pull request to leader (Enter 'exit' to exit or 'continue' to pull without stop): ");
+        String output =  input.nextLine();
+
+        while (Strings.isNullOrEmpty(output) || output.equalsIgnoreCase(Constants.CONTINUE_CMD) || !output.equalsIgnoreCase(Constants.EXIT_CMD)) {
             if (broker == null) {
                 setNewBroker();
             }
@@ -54,25 +62,27 @@ public class Consumer extends Client {
                         byte[] body = PacketHandler.getData(response);
 
                         if (body != null) {
-                            Packet<PullResponse> pullResponsePacket = JSONDeserializer.deserializePacket(body, new TypeToken<Packet<PullResponse>>() {
-                            }.getType());
+                            Packet<PullResponse> pullResponsePacket = JSONDeserializer.deserializePacket(body, new TypeToken<Packet<PullResponse>>() {}.getType());
 
                             if (pullResponsePacket != null && pullResponsePacket.getObject() != null) {
                                 PullResponse pullResponse = pullResponsePacket.getObject();
 
-                                logger.info(String.format("[%s] Received %d number of logs [Expected %d] from the leader %s with nextOffset as %d.", config.getLocal().toString(), pullResponse.getNumOfLogs(), config.getNumOfLogs(), broker.toString(), pullResponse.getNextOffset()));
+                                if (pullResponsePacket.getStatus() == Constants.RESPONSE_STATUS.OK.ordinal()) {
+                                    logger.info(String.format("[%s] Received %d number of logs [Expected %d] from the leader %s with nextOffset as %d.", config.getLocal().toString(), pullResponse.getNumOfLogs(), config.getNumOfLogs(), broker.toString(), pullResponse.getNextOffset()));
 
-                                int index = 0;
-                                while (index < pullResponse.getNumOfLogs()) {
-                                    byte[] content = pullResponse.getData(index);
-                                    FileManager.write(config.getLocation(), content);
+                                    int index = 0;
+                                    while (index < pullResponse.getNumOfLogs()) {
+                                        byte[] content = pullResponse.getData(index);
+                                        FileManager.write(config.getLocation(), content);
 
-                                    index++;
+                                        index++;
+                                    }
+
+                                    config.setOffset(pullResponse.getNextOffset());
+                                } else if (pullResponsePacket.getStatus() == Constants.RESPONSE_STATUS.NOT_FOUND.ordinal()) {
+                                    logger.warn(String.format("[%s] No entry found with the offset %d by broker %s.", config.getLocal().toString(), pullResponse.getNextOffset(), broker.toString()));
+                                    output = null;
                                 }
-
-                                config.setOffset(pullResponse.getNextOffset());
-                            } else {
-                                logger.warn(String.format("[%s] Either unable to parse received pull response or pull response object is null. Resending packet", config.getLocal().toString()));
                             }
                         }
                     }
@@ -84,6 +94,11 @@ public class Consumer extends Client {
             } else {
                 Channels.remove(broker.toString());
                 broker = null;
+            }
+
+            if (Strings.isNullOrEmpty(output) || !output.equalsIgnoreCase(Constants.CONTINUE_CMD)) {
+                System.out.print("Enter to send new pull request to leader (Enter 'exit' to exit or 'continue' to pull without stop): ");
+                output = input.nextLine();
             }
         }
     }

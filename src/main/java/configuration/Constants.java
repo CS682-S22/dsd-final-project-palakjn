@@ -19,6 +19,8 @@ public class Constants {
     public static int FAULT_DETECTOR_MIN_VALUE = 2000;
     public static int FAULT_DETECTOR_MAX_VALUE = 3000;
     public static int HEARTBEAT_TIMEOUT_THRESHOLD = 1500;
+    public static String CONTINUE_CMD = "continue";
+    public static String EXIT_CMD = "exit";
 
     public enum ROLE {
         LEADER,
@@ -50,6 +52,7 @@ public class Constants {
         OK,
         REDIRECT,
         ELECTION,
-        NOT_OK
+        NOT_OK,
+        NOT_FOUND
     }
 }

@@ -25,12 +25,12 @@ public class Broadcast {
      * Send NACK if
      */
     public void process(Connection connection, byte[] packet, int seqNum) {
-        int lastReceivedOffset = CacheManager.getLastReceivedOffset(connection.getDestination().toString());
-        if (seqNum > lastReceivedOffset) {
-            byte[] data = PacketHandler.getData(packet);
+        if (CacheManager.getCurrentRole() == Constants.ROLE.LEADER.ordinal()) {
+            int lastReceivedOffset = CacheManager.getLastReceivedOffset(connection.getDestination().toString());
+            if (seqNum > lastReceivedOffset) {
+                byte[] data = PacketHandler.getData(packet);
 
-            if (data != null) {
-                if (CacheManager.getCurrentRole() == Constants.ROLE.LEADER.ordinal()) {
+                if (data != null) {
                     //Appending the log to the local
                     if (CacheManager.addEntry(data, CacheManager.getTerm(), connection.getDestination().toString(), seqNum)) {
                         //Updating acknowledgement of the packets received by current leader
@@ -40,15 +40,15 @@ public class Broadcast {
                         logger.warn(String.format("[%s] Not able to write log with the offset %d from the client %s.", CacheManager.getLocal().toString(), seqNum, connection.getDestination().toString()));
                         nodeService.sendNACK(connection.getDestination(), Constants.REQUESTER.SERVER, seqNum);
                     }
-                } else if (CacheManager.getCurrentRole() == Constants.ROLE.FOLLOWER.ordinal()) {
-                    nodeService.sendLeaderInfo(connection.getDestination(), seqNum);
-                } else if (CacheManager.getCurrentRole() == Constants.ROLE.CANDIDATE.ordinal()) {
-                    nodeService.sendWaitToClient(connection.getDestination(), seqNum);
                 }
+            } else {
+                logger.warn(String.format("[%s] Server received duplicate DATA request from client %s to hold log at the starting offset %d. Server already holds the client logs till offset %d.", CacheManager.getLocal().toString(), connection.getDestination().toString(), seqNum, lastReceivedOffset));
+                nodeService.sendACK(connection.getDestination(), Constants.REQUESTER.SERVER, seqNum);
             }
-        } else {
-            logger.warn(String.format("[%s] Server received duplicate DATA request from client %s to hold log at the starting offset %d. Server already holds the client logs till offset %d.", CacheManager.getLocal().toString(), connection.getDestination().toString(), seqNum, lastReceivedOffset));
-            nodeService.sendACK(connection.getDestination(), Constants.REQUESTER.SERVER, seqNum);
+        } else if (CacheManager.getCurrentRole() == Constants.ROLE.FOLLOWER.ordinal()) {
+            nodeService.sendLeaderInfo(connection.getDestination(), seqNum);
+        } else if (CacheManager.getCurrentRole() == Constants.ROLE.CANDIDATE.ordinal()) {
+            nodeService.sendWaitToClient(connection.getDestination(), seqNum);
         }
     }
 }

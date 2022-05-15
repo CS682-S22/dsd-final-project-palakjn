@@ -103,8 +103,11 @@ public class Broker {
             client.send(data);
             logger.info(String.format("[%s] Send %d number of logs to the consumer %s with next offset as %d.", CacheManager.getLocal().toString(), dataToSend.size(), client.toString(), nextOffset + 1));
         } else {
-            nodeService.sendNACK(client, Constants.REQUESTER.SERVER, pullRequest.getFromOffset());
-            logger.warn(String.format("[%s] Broker not holding offset %d. Sending NACK to consumer %s.", CacheManager.getLocal().toString(), pullRequest.getFromOffset(), client.toString()));
+            PullResponse pullResponse = new PullResponse(pullRequest.getFromOffset(), 0, null);
+            Packet<PullResponse> packet = new Packet<>(Constants.RESPONSE_STATUS.NOT_FOUND.ordinal(), pullResponse);
+            byte[] data = PacketHandler.createPacket(Constants.REQUESTER.SERVER, Constants.HEADER_TYPE.PULL_RESP, packet, seqNum, client);
+            client.send(data);
+            logger.warn(String.format("[%s] Broker not holding offset %d. Sending NOT FOUND response to consumer %s.", CacheManager.getLocal().toString(), pullRequest.getFromOffset(), client.toString()));
         }
     }
 }

@@ -87,7 +87,7 @@ public class Replication {
 
             if (appendEntriesRequest.getTerm() > currentTerm) {
                 logger.info(String.format("[%s] Received AppendEntries from new leader %s with the new term %d. Old term: %d", CacheManager.getLocal().toString(), leader.toString(), appendEntriesRequest.getTerm(), currentTerm));
-                CacheManager.setTerm(appendEntriesRequest.getTerm());
+                currentTerm = CacheManager.setTerm(appendEntriesRequest.getTerm());
                 CacheManager.setVoteFor(-1, false);
                 Election.stopTimer();
                 FaultDetector.startTimer();
@@ -180,7 +180,7 @@ public class Replication {
                     index2++;
                     logger.debug(String.format("[%s] Found same entry in current server log at the index equal to the leader %s's log index.", CacheManager.getLocal().toString(), leader.toString()));
                 } else {
-                    logger.info(String.format("[%s] Repairing logs. Removing logs from %d index to %d index as those entries not found in leader %s log.", CacheManager.getLocal().toString(), index2, CacheManager.getLogLength(), leader.toString()));
+                    logger.info(String.format("[%s] Repairing logs. Removing logs from %d index to %d index as those entries not found in leader %s log.", CacheManager.getLocal().toString(), index2, CacheManager.getLogLength() - 1, leader.toString()));
                     CacheManager.removeEntryFrom(index2);
                     break;
                 }

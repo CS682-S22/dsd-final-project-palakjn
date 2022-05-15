@@ -1,12 +1,12 @@
 package utils;
 
+import consensus.controllers.CacheManager;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import consensus.controllers.CacheManager;
 
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
+import java.io.*;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 
 /**
  * Responsible for all the I/O tasks.
@@ -22,10 +22,10 @@ public class FileManager {
     public static boolean write(String location, byte[] logData, int fromOffset) {
         boolean isSuccess = false;
 
-        try (FileOutputStream outputStream = new FileOutputStream(location, true)) {
-            outputStream.getChannel().position(fromOffset);
-            outputStream.write(logData);
-            outputStream.flush();
+        try (RandomAccessFile writer = new RandomAccessFile(location, "rw"); FileChannel channel = writer.getChannel()) {
+            channel.position(fromOffset);
+            ByteBuffer buff = ByteBuffer.wrap(logData);
+            channel.write(buff);
 
             logger.info(String.format("[%s] Wrote %d bytes to location %s at the position %d.", CacheManager.getLocal().toString(), logData.length, location, fromOffset));
             isSuccess = true;
@@ -37,14 +37,14 @@ public class FileManager {
     }
 
     /**
-     * Append the given log to the end
+     * Append the given log to the end as a new line in String format
      */
     public static boolean write(String location, byte[] logData) {
         boolean isSuccess = false;
 
-        try (FileOutputStream outputStream = new FileOutputStream(location, true)) {
-            outputStream.write(logData);
-            outputStream.flush();
+        try (BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(location, true))) {
+            bufferedWriter.write(new String(logData));
+            bufferedWriter.newLine();
 
             logger.info(String.format("[%s] Wrote %d bytes to location %s.", CacheManager.getLocal().toString(), logData.length, location));
             isSuccess = true;
