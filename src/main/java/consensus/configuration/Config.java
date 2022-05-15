@@ -26,6 +26,10 @@ public class Config {
     private String location;
     @Expose
     private String commitLocation;
+    @Expose
+    private float lossRate;
+    @Expose
+    private int delay;
 
     /**
      * Get the detail of local running instance
@@ -82,6 +86,19 @@ public class Config {
         return location;
     }
 
+    /**
+     * @return loss rate
+     */
+    public float getLossRate() {
+        return lossRate;
+    }
+
+    /**
+     * @return time in milliseconds
+     */
+    public int getDelay() {
+        return delay;
+    }
 
     /**
      * Get the commit file location

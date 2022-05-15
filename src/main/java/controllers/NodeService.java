@@ -1,6 +1,7 @@
 package controllers;
 
 import configuration.Constants;
+import models.Connections;
 import models.Host;
 import models.Packet;
 import org.apache.logging.log4j.LogManager;
@@ -29,7 +30,7 @@ public class NodeService {
             Socket socket = new Socket(address, port);
             logger.info(String.format("[%s] Successfully connected to the server %s:%d.", CacheManager.getLocal().toString(), address, port));
 
-            connection = new Connection(socket, address, port);
+            connection = Connections.getConnection(socket, address, port);;
             if (!connection.openConnection()) {
                 connection = null;
             }

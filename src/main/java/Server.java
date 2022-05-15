@@ -9,6 +9,7 @@ import consensus.controllers.database.StateDB;
 import consensus.models.Entry;
 import consensus.models.NodeState;
 import controllers.Connection;
+import models.Connections;
 import models.Host;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -48,6 +49,7 @@ public class Server {
                 CacheManager.setLocal(config.getLocal());
                 server.addMembers(config);
                 DataSource.init(config);
+                Connections.init(config.getLossRate(), config.getDelay());
 
                 //Getting data from disk to get the details of status of the nodes before crash
                 server.setNodeStatus(config);
@@ -178,7 +180,7 @@ public class Server {
             try {
                 Socket socket = serverSocket.accept();
                 logger.info(String.format("[%s:%d] Received the connection from the host.", socket.getInetAddress().getHostAddress(), socket.getPort()));
-                Connection connection = new Connection(socket, socket.getInetAddress().getHostAddress(), socket.getPort());
+                Connection connection = Connections.getConnection(socket, socket.getInetAddress().getHostAddress(), socket.getPort());
                 if (connection.openConnection()) {
                     RequestHandler requestHandler = new RequestHandler(connection);
                     threadPool.execute(requestHandler::process);
