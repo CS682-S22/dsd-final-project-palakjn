@@ -84,6 +84,14 @@ public class Members {
     }
 
     /**
+     * Clear all the members
+     */
+    public void clear() {
+        members.clear();
+        local = null;
+    }
+
+    /**
      * Get the number of neighbors
      */
     public int getCount() {

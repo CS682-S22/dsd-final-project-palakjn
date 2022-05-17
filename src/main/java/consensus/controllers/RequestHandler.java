@@ -111,14 +111,14 @@ public class RequestHandler {
 
                 Packet<AppendEntriesRequest> packet = JSONDeserializer.deserializePacket(body, new TypeToken<Packet<AppendEntriesRequest>>(){}.getType());
                 if (packet != null && packet.getObject() != null) {
-                    Replication.appendEntries(packet.getObject());
+                    Replication.get().appendEntries(packet.getObject());
                 }
             } else if (header.getType() == Constants.HEADER_TYPE.ENTRY_RESP.ordinal()) {
                 logger.info(String.format("[%s] Received AppendEntry response packet from follower: %s.", CacheManager.getLocal().toString(), connection.getDestination().toString()));
 
                 Packet<AppendEntriesResponse> packet = JSONDeserializer.deserializePacket(body, new TypeToken<Packet<AppendEntriesResponse>>(){}.getType());
                 if (packet != null && packet.getObject() != null) {
-                    Replication.processAcknowledgement(packet.getObject());
+                    Replication.get().processAcknowledgement(packet.getObject());
                 } else {
                     logger.info(String.format("[%s] Not found response packet inside the packet sent from follower: %s", CacheManager.getLocal().toString(), connection.getDestination().toString()));
                 }
@@ -127,14 +127,14 @@ public class RequestHandler {
 
                 Packet<VoteRequest> packet = JSONDeserializer.deserializePacket(body, new TypeToken<Packet<VoteRequest>>(){}.getType());
                 if (packet != null && packet.getObject() != null) {
-                    Election.processVoteRequest(packet.getObject());
+                    Election.get().processVoteRequest(packet.getObject());
                 }
             } else if (header.getType() == Constants.HEADER_TYPE.VOTE_RESP.ordinal()) {
                 logger.info(String.format("[%s] Received VoteResponse packet from voter %s", CacheManager.getLocal().toString(), connection.getDestination().toString()));
 
                 Packet<VoteResponse> packet = JSONDeserializer.deserializePacket(body, new TypeToken<Packet<VoteResponse>>(){}.getType());
                 if (packet != null && packet.getObject() != null) {
-                    Election.processVoteResponse(packet.getObject());
+                    Election.get().processVoteResponse(packet.getObject());
                 }
             } else {
                 logger.info(String.format("[%s] Received invalid %d header type from server: %s.", CacheManager.getLocal().toString(), header.getType(), connection.getDestination().toString()));

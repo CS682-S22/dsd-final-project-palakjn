@@ -74,4 +74,16 @@ public class FileManager {
 
         return data;
     }
+
+    /**
+     * Get the length of the file
+     */
+    public static long getFileLength(String location) {
+        long size = 0;
+
+        File file = new File(location);
+        size = file.length();
+
+        return size;
+    }
 }

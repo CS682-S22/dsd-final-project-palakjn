@@ -35,6 +35,12 @@ public class Entry {
         this.isCommitted = isCommitted;
     }
 
+    public Entry(int term, int fromOffset, int toOffset) {
+        this.term = term;
+        this.fromOffset = fromOffset;
+        this.toOffset = toOffset;
+    }
+
     public Entry(Entry entry) {
         this.term = entry.getTerm();
         this.fromOffset = entry.getFromOffset();

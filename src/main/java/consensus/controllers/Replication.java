@@ -27,6 +27,7 @@ import java.util.TimerTask;
 public class Replication {
     private static final Logger logger = LogManager.getLogger(Replication.class);
     private static Timer timer;
+    private static Replication replication;
 
     private static final Object appendLock = new Object();
     private static final Object commitLock = new Object();
@@ -34,9 +35,20 @@ public class Replication {
     private Replication() {}
 
     /**
+     * Get the object of existing Replication object if exist else create new
+     */
+    public synchronized static Replication get() {
+        if (replication == null) {
+            replication = new Replication();
+        }
+
+        return replication;
+    }
+
+    /**
      * Start the timer to replicate the logs to followers if the current server is the leader
      */
-    public static void startTimer() {
+    public void startTimer() {
         timer = new Timer();
         TimerTask task = new TimerTask() {
             @Override
@@ -65,7 +77,7 @@ public class Replication {
     /**
      * Restart the timer
      */
-    public static void restart() {
+    public void restart() {
         stopTimer();
         startTimer();
     }
@@ -73,14 +85,14 @@ public class Replication {
     /**
      * Stop the timer
      */
-    public static void stopTimer() {
+    public void stopTimer() {
         timer.cancel();
     }
 
     /**
      * Accept the new logs from the leader if last received log term and index matches with the leader
      */
-    public static void appendEntries(AppendEntriesRequest appendEntriesRequest) {
+    public void appendEntries(AppendEntriesRequest appendEntriesRequest) {
         synchronized (appendLock) {
             int currentTerm = CacheManager.getTerm();
             Host leader = CacheManager.getNeighbor(appendEntriesRequest.getLeaderId());
@@ -89,14 +101,14 @@ public class Replication {
                 logger.info(String.format("[%s] Received AppendEntries from new leader %s with the new term %d. Old term: %d", CacheManager.getLocal().toString(), leader.toString(), appendEntriesRequest.getTerm(), currentTerm));
                 currentTerm = CacheManager.setTerm(appendEntriesRequest.getTerm());
                 CacheManager.setVoteFor(-1, false);
-                Election.stopTimer();
-                FaultDetector.startTimer();
+                Election.get().stopTimer();
+                FaultDetector.get().startTimer();
             }
 
             if (appendEntriesRequest.getTerm() == currentTerm) {
                 CacheManager.setCurrentRole(Constants.ROLE.FOLLOWER.ordinal());
                 CacheManager.setCurrentLeader(appendEntriesRequest.getLeaderId());
-                FaultDetector.heartBeatReceived();
+                FaultDetector.get().heartBeatReceived();
             }
 
             boolean logOk = CacheManager.getLogLength() >= appendEntriesRequest.getPrefixLen() &&
@@ -135,7 +147,7 @@ public class Replication {
     /**
      * Receiving the acknowledgement from the follower
      */
-    public static void processAcknowledgement(AppendEntriesResponse appendEntriesResponse) {
+    public void processAcknowledgement(AppendEntriesResponse appendEntriesResponse) {
         int currentTerm = CacheManager.getTerm();
 
         Host follower = CacheManager.getNeighbor(appendEntriesResponse.getNodeId());
@@ -158,8 +170,8 @@ public class Replication {
             CacheManager.setTerm(appendEntriesResponse.getTerm());
             CacheManager.setCurrentRole(Constants.ROLE.FOLLOWER.ordinal());
             CacheManager.setVoteFor(-1, false);
-            Election.stopTimer();
-            FaultDetector.startTimer();
+            Election.get().stopTimer();
+            FaultDetector.get().startTimer();
         }
 
     }
@@ -167,7 +179,7 @@ public class Replication {
     /**
      * Write the logs received from leader to local
      */
-    private static void writeLogs(AppendEntriesRequest appendEntriesRequest) {
+    public void writeLogs(AppendEntriesRequest appendEntriesRequest) {
         Host leader = CacheManager.getNeighbor(appendEntriesRequest.getLeaderId());
         int index = 0;
 
@@ -219,7 +231,7 @@ public class Replication {
     /**
      * Commit log entries after receiving acknowledgements from the majority of the nodes
      */
-    private static void commitLogEntries() {
+    public void commitLogEntries() {
         synchronized (commitLock) {
             int logLength = CacheManager.getLogLength();
             int commitLength = CacheManager.getCommitLength();
@@ -255,7 +267,7 @@ public class Replication {
     /**
      * Sending log to the broker after being replicated to the majority of nodes
      */
-    private static boolean sendToBroker(int commitLength) {
+    private boolean sendToBroker(int commitLength) {
         logger.info(String.format("[%s] Committing log number %d.", CacheManager.getLocal().toString(), commitLength));
         boolean isSuccess = false;
 
@@ -276,7 +288,7 @@ public class Replication {
     /**
      * Replicate the logs which are not sent before to the follower
      */
-    private static void replicate(int currentTerm, Host follower) {
+    public void replicate(int currentTerm, Host follower) {
         //Getting the length of the logs already being sent to the follower before
         int prefixLen = CacheManager.getSentLength(follower.getId());
         logger.info(String.format("[%s] Need to send logs from the prefixLen: %d to the follower: %s", CacheManager.getLocal().toString(), prefixLen, follower.toString()));

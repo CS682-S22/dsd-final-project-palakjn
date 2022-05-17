@@ -19,11 +19,25 @@ public class FaultDetector {
     private static volatile boolean isRunning;
     private static volatile long lastTimeSpan;
     private static Timer timer;
+    private static FaultDetector faultDetector;
+
+    private FaultDetector() {}
+
+    /**
+     * Get the object of existing FaultDetector object if exist else create new
+     */
+    public synchronized static FaultDetector get() {
+        if (faultDetector == null) {
+            faultDetector = new FaultDetector();
+        }
+
+        return faultDetector;
+    }
 
     /**
      * Start the timer to detect leader failure
      */
-    public synchronized static void startTimer() {
+    public synchronized void startTimer() {
         if(!isRunning) {
             isRunning = true;
             timer = new Timer();
@@ -38,7 +52,7 @@ public class FaultDetector {
 
                     if (timeSinceLastHeartBeat >= Constants.HEARTBEAT_TIMEOUT_THRESHOLD) {
                         logger.info(String.format("[%s] Haven't heard from leader since %d. Threshold is %d. Starting election.", CacheManager.getLocal().toString(), timeSinceLastHeartBeat, Constants.HEARTBEAT_TIMEOUT_THRESHOLD));
-                        Election.startElection();
+                        Election.get().startElection();
                     } else {
                         startTimer();
                     }
@@ -54,17 +68,19 @@ public class FaultDetector {
     /**
      * Stop the timer
      */
-    public synchronized static void stopTimer() {
-        ThreadContext.put("module",CacheManager.getLocal().getName());
-        logger.info(String.format("[%s] Stopping the fault detector.", CacheManager.getLocal().toString()));
-        isRunning = false;
-        timer.cancel();
+    public synchronized void stopTimer() {
+        if (timer != null) {
+            ThreadContext.put("module", CacheManager.getLocal().getName());
+            logger.info(String.format("[%s] Stopping the fault detector.", CacheManager.getLocal().toString()));
+            isRunning = false;
+            timer.cancel();
+        }
     }
 
     /**
      * Reporting the timespan when received AppendEntries packet from the leader
      */
-    public static void heartBeatReceived() {
+    public void heartBeatReceived() {
         lastTimeSpan = System.currentTimeMillis();
         logger.info(String.format("[%s] Received AppendEntries from leader at time %d.", CacheManager.getLocal().toString(), lastTimeSpan));
     }

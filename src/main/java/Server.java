@@ -146,7 +146,7 @@ public class Server {
         CacheManager.setLocation(config.getLocation());
 
         CacheManager.setCurrentRole(Constants.ROLE.FOLLOWER.ordinal());
-        FaultDetector.startTimer();
+        FaultDetector.get().startTimer();
     }
 
     /**

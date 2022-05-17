@@ -25,12 +25,30 @@ public class Election {
     private static final List<Integer> votesReceived = new ArrayList<>();
     private static Timer electionTimer;
     private static volatile boolean isElectionTimerStarted;
+    private static Election election;
+
+    private Election() {}
+
+    /**
+     * Get the object of existing Election object if exist else create new
+     */
+    public synchronized static Election get() {
+        if (election == null) {
+            election = new Election();
+        }
+
+        return election;
+    }
+
+    public static void set(Election election) {
+        Election.election = election;
+    }
 
     /**
      * Start the election when detected that leader is failed.
      */
-    public static void startElection() {
-        FaultDetector.stopTimer();
+    public void startElection() {
+        FaultDetector.get().stopTimer();
 
         if (CacheManager.getCurrentRole() != Constants.ROLE.CANDIDATE.ordinal()) {
             logger.info(String.format("[%s] Starting election process.", CacheManager.getLocal().toString()));
@@ -63,7 +81,7 @@ public class Election {
     /**
      * Processing Vote Request received from candidate
      */
-    public static synchronized void processVoteRequest(VoteRequest voteRequest) {
+    public synchronized void processVoteRequest(VoteRequest voteRequest) {
         int currentTerm = CacheManager.getTerm();
         Host candidate = CacheManager.getNeighbor(voteRequest.getCandidateId());
 
@@ -73,7 +91,7 @@ public class Election {
             CacheManager.setCurrentRole(Constants.ROLE.FOLLOWER.ordinal());
             CacheManager.setVoteFor(-1, false);
 
-            FaultDetector.startTimer();
+            FaultDetector.get().startTimer();
         }
 
         int lastTerm = CacheManager.getLastTerm();
@@ -100,7 +118,7 @@ public class Election {
     /**
      * Collecting votes from the voters
      */
-    public static synchronized void processVoteResponse(VoteResponse voteResponse) {
+    public synchronized void processVoteResponse(VoteResponse voteResponse) {
         int currentTerm = CacheManager.getTerm();
         Host voter = CacheManager.getNeighbor(voteResponse.getNodeId());
         logger.info(String.format("[%s] Received vote response from voter %s at the term %d.", CacheManager.getLocal().toString(), voter.toString(), currentTerm));
@@ -121,7 +139,7 @@ public class Election {
                 CacheManager.setCurrentLeader(CacheManager.getLocal().getId());
                 CacheManager.setVoteFor(-1, false);
                 stopTimer();
-                FaultDetector.stopTimer();
+                FaultDetector.get().stopTimer();
 
                 List<Host> followers = CacheManager.getNeighbors();
                 for (Host follower : followers) {
@@ -129,14 +147,14 @@ public class Election {
                     CacheManager.setAckedLength(follower.getId(), 0);
                 }
 
-                Replication.startTimer();
+                Replication.get().startTimer();
             }
         } else if (voteResponse.getTerm() > currentTerm) {
             logger.info(String.format("[%s] Voter %s's term %d is more than current term %d. Changing role to follower.", CacheManager.getLocal().toString(), voter.toString(), voteResponse.getTerm(), currentTerm));
             stopTimer();
             CacheManager.setTerm(voteResponse.getTerm());
             CacheManager.setCurrentRole(Constants.ROLE.FOLLOWER.ordinal());
-            FaultDetector.startTimer();
+            FaultDetector.get().startTimer();
             CacheManager.setVoteFor(-1, false);
         }
     }
@@ -144,7 +162,7 @@ public class Election {
     /**
      * Start the election timer
      */
-    public static synchronized void startTimer() {
+    public synchronized void startTimer() {
         if (!isElectionTimerStarted) {
             isElectionTimerStarted = true;
 
@@ -174,7 +192,7 @@ public class Election {
     /**
      * Stop the election timer
      */
-    public static synchronized void stopTimer() {
+    public synchronized void stopTimer() {
         if (electionTimer != null) {
             logger.info(String.format("[%s] Stopping election timer.", CacheManager.getLocal().toString()));
             isElectionTimerStarted = false;

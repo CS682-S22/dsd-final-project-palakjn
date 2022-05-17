@@ -87,6 +87,17 @@ public class CacheManager {
     }
 
     /**
+     * Remove all members
+     */
+    public static void removeMembers() {
+        memberLock.writeLock().lock();
+
+        members.clear();
+
+        memberLock.writeLock().unlock();
+    }
+
+    /**
      * Get all the members
      */
     public static List<Host> getMembers() {
@@ -234,7 +245,7 @@ public class CacheManager {
 
         if (nodeId == -1) {
             nodeState.setVoteFor(-1);
-        } else if (force || nodeState.getVotedFor() == -1 || nodeState.getVotedFor() == nodeId) {
+        } else if (force || nodeState.getVotedFor() == -1 || nodeState.getVotedFor() != nodeId) {
             nodeState.setVoteFor(nodeId);
             isVoted = true;
         }
